@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import re
 import emoji
 from twisted.internet import reactor
@@ -9,18 +11,38 @@ except Exception as e:
     pass
 
 class Player(object):
-    def __init__(self, client, name, team, match, skin):
+    def __init__(self, client, name, team, match, skin, gm):
         self.client = client
         self.server = client.server
         self.match = match
         self.skin = skin
+        self.gameMode = gm
         
         self.name = ' '.join(emoji.emojize(re.sub(r"[^\x00-\x7F]+", "", emoji.demojize(name)).strip())[:20].split()).upper()
         self.team = team
         if len(self.team) > 0 and self.server.checkCurse(self.name):
             self.name = str()
         if len(self.name) == 0:
-            self.name = self.server.defaultName
+            self.name = self.server.defaultName if self.client.username != "" else ("【G】"+self.server.defaultName)
+        elif len(self.client.username) == 0:
+            self.name = "【G】" + self.name
+        if self.client.username.lower() in ["taliondiscord",
+                                            "damonj17",
+                                            "ddmil@marioroyale:~$",
+                                            "pixelcraftian",
+                                            "igor",
+                                            "minus",
+                                            "cyuubi",
+                                            "gyorokpeter",
+                                            "zizzydizzymc",
+                                            "nuts & milk",
+                                            "jupitersky",
+                                            "nethowarrior",
+                                            "real novex",
+                                            "nightyoshi370"]:
+            self.name = "【𝐃𝐄𝐕】" + self.name
+        elif self.skin in [52]:
+            self.skin = 0
         self.pendingWorld = None
         self.level = int()
         self.zone = int()
@@ -175,7 +197,7 @@ class Player(object):
                     # We already filter players that have a squad so...
                     if len(self.team) == 0 and self.server.checkCurse(self.name):
                         name = "[ censored ]"
-                    embed = DiscordEmbed(description='**%s** has achieved **#1** victory royale!' % name, color=0xffff00)
+                    embed = DiscordEmbed(description='**%s** has achieved **#1** victory royale!%s' % (name, " (PVP Mode)" if self.gameMode == 1 else " (Hell mode)" if self.gameMode == 2 else ""), color=0xffff00)
                     self.server.discordWebhook.add_embed(embed)
                     self.server.discordWebhook.execute()
                     self.server.discordWebhook.remove_embed(0)

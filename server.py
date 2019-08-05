@@ -45,7 +45,8 @@ from buffer import Buffer
 from player import Player
 from match import Match
 
-NUM_SKINS = 33   #temporary until shop is implemented
+NUM_SKINS = 176   #temporary until shop is implemented
+NUM_GM = 3
 
 class MyServerProtocol(WebSocketServerProtocol):
     def __init__(self, server):
@@ -57,8 +58,8 @@ class MyServerProtocol(WebSocketServerProtocol):
 
         self.pendingStat = None
         self.stat = str()
-        self.username = str();
-        self.session = str();
+        self.username = str()
+        self.session = str()
         self.player = None
         self.blocked = bool()
 
@@ -198,13 +199,15 @@ class MyServerProtocol(WebSocketServerProtocol):
 
                 name = packet["name"]
                 team = packet["team"][:3].strip().upper()
-                priv = packet["private"]
+                priv = packet["private"] if "private" in packet else False
                 skin = int(packet["skin"]) if "skin" in packet else 0
+                gm = int(packet["gm"]) if "gm" in packet else 0
                 self.player = Player(self,
-                                     name if self.username != "" else ("*"+name),
+                                     name,
                                      team if team != "" else self.server.defaultTeam,
-                                     self.server.getMatch(team, priv if "private" in packet else False),
-                                     skin if skin in range(NUM_SKINS) else 0)
+                                     self.server.getMatch(team, priv, gm),
+                                     skin if skin in range(NUM_SKINS) else 0,
+                                     gm if gm in range(NUM_GM) else 0)
                 self.loginSuccess()
                 self.server.players.append(self.player)
                 
@@ -226,8 +229,9 @@ class MyServerProtocol(WebSocketServerProtocol):
 
                 status, msg = datastore.login(username, packet["password"])
 
+                j = {"type": "llg", "status": status, "msg": msg}
                 if status:
-                    self.username = username
+                    j["username"] = self.username = username
                     self.session = msg["session"]
                     self.server.authd.append(self.username)
                 else:
@@ -239,7 +243,7 @@ class MyServerProtocol(WebSocketServerProtocol):
                             del self.server.maxLoginTries[self.address]
                             self.server.loginBlocked.append(self.address)
                             reactor.callLater(60, self.server.loginBlocked.remove, self.address)
-                self.sendJSON({"type": "llg", "status": status, "msg": msg})
+                self.sendJSON(j)
 
             elif type == "llo": #logout
                 if self.username == "" or self.player is not None or self.pendingStat is None:
@@ -303,14 +307,15 @@ class MyServerProtocol(WebSocketServerProtocol):
                 
                 status, msg = datastore.resumeSession(packet["session"])
 
+                j = {"type": "lrs", "status": status, "msg": msg}
                 if status:
                     if msg["username"] in self.server.authd:
                         self.sendJSON({"type": "lrs", "status": False, "msg": "account already in use"})
                         return
-                    self.username = msg["username"]
+                    j["username"] = self.username = msg["username"]
                     self.session = msg["session"]
                     self.server.authd.append(self.username)
-                self.sendJSON({"type": "lrs", "status": status, "msg": msg})
+                self.sendJSON(j)
 
             elif type == "lpr": #update profile
                 if self.username == "" or self.player is not None or self.pendingStat is None:
@@ -318,6 +323,13 @@ class MyServerProtocol(WebSocketServerProtocol):
                     return
                 
                 datastore.updateAccount(self.username, packet)
+
+            elif type == "lpc": #password change
+                if self.username == "" or self.player is not None or self.pendingStat is None:
+                    self.sendClose()
+                    return
+
+                datastore.changePassword(self.username, packet["password"])
 
         elif self.stat == "g":
             if type == "g00": # Ingame state ready
@@ -434,7 +446,7 @@ class MyServerFactory(WebSocketServerFactory):
         else:
             self.discordWebhook = None
 
-        self.randomWorldList = list()
+        self.randomWorldList = dict()
 
         self.maxLoginTries = {}
         self.loginBlocked = []
@@ -478,6 +490,16 @@ class MyServerFactory(WebSocketServerFactory):
         self.voteRateToStart = config.getfloat('Match', 'VoteRateToStart')
         self.allowLateEnter = config.getboolean('Match', 'AllowLateEnter')
         self.worlds = config.get('Match', 'Worlds').strip().split(',')
+        self.worldsPvP = config.get('Match', 'WorldsPVP').strip()
+        if len(self.worldsPvP) == 0:
+            self.worldsPvP = list(self.worlds)
+        else:
+            self.worldsPvP = self.worldsPvP.split(',')
+        self.worldsHell = config.get('Match', 'WorldsHell').strip()
+        if len(self.worldsHell) == 0:
+            self.worldsHell = list(self.worlds)
+        else:
+            self.worldsHell = self.worldsHell.split(',')
 
     def generalUpdate(self):
         playerCount = len(self.players)
@@ -513,17 +535,18 @@ class MyServerFactory(WebSocketServerFactory):
             
         reactor.callLater(5, self.generalUpdate)
 
-    def getRandomWorld(self):
-        if len(self.worlds) == 0:
+    def getRandomWorld(self, gameMode):
+        worlds = self.worldsPvP if gameMode == 1 else self.worldsHell if gameMode == 2 else self.worlds
+        if len(worlds) == 0:
             return None
         
-        if len(self.randomWorldList) > 0:
-            selected = random.choice(self.randomWorldList)
-            self.randomWorldList.remove(selected)
+        if gameMode in self.randomWorldList and len(self.randomWorldList[gameMode]) > 0:
+            selected = random.choice(self.randomWorldList[gameMode])
+            self.randomWorldList[gameMode].remove(selected)
             return selected
         
-        self.randomWorldList = list(self.worlds) # Make a copy
-        return self.getRandomWorld()
+        self.randomWorldList[gameMode] = list(worlds) # Make a copy
+        return self.getRandomWorld(gameMode)
 
     # Maybe this should be in a util class?
     def leet2(self, word):
@@ -576,20 +599,20 @@ class MyServerFactory(WebSocketServerFactory):
         protocol.factory = self
         return protocol
 
-    def getMatch(self, roomName, private):
+    def getMatch(self, roomName, private, gameMode):
         if private and roomName == "":
-            return Match(self, roomName, private)
+            return Match(self, roomName, private, gameMode)
         
         fmatch = None
         for match in self.matches:
-            if not match.closed and len(match.players) < self.playerCap and private == match.private and (not private or match.roomName == roomName):
+            if not match.closed and len(match.players) < self.playerCap and gameMode == match.gameMode and private == match.private and (not private or match.roomName == roomName):
                 if not self.allowLateEnter and match.playing:
                     continue
                 fmatch = match
                 break
 
         if fmatch == None:
-            fmatch = Match(self, roomName, private)
+            fmatch = Match(self, roomName, private, gameMode)
             self.matches.append(fmatch)
 
         return fmatch
@@ -601,7 +624,7 @@ class MyServerFactory(WebSocketServerFactory):
 
 if __name__ == '__main__':
     factory = MyServerFactory(u"ws://127.0.0.1:{0}/royale/ws")
-    # factory.setProtocolOptions(maxConnections=2)
+    factory.setProtocolOptions(autoPingInterval=5, autoPingTimeout=5)
 
     reactor.listenTCP(factory.listenPort, factory)
     reactor.run()

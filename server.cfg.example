@@ -44,3 +44,9 @@ AllowLateEnter: 1
 
 # The game's worlds, if you don't know what you're doing, do not change it
 Worlds: world-1,world-2,world-3,world-5,world-6,world-l1,world-p
+
+# The gameMode PVP worlds
+WorldsPVP: 
+
+# The gameMode Hell worlds
+WorldsHell: 

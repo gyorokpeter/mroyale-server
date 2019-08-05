@@ -8,7 +8,7 @@ import jsonschema
 levelJsonSchema = json.loads(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "levelSchema.json"), "r").read())
 
 class Match(object):
-    def __init__(self, server, roomName, private):
+    def __init__(self, server, roomName, private, gameMode):
         self.server = server
 
         self.forceLevel = ""
@@ -17,6 +17,7 @@ class Match(object):
         self.roomName = roomName
         self.closed = False
         self.private = private
+        self.gameMode = gameMode
         self.playing = False
         self.autoStartTimer = None
         self.startTimer = int()
@@ -186,7 +187,7 @@ class Match(object):
         except:
             pass
         
-        self.world = self.forceLevel if self.forceLevel != "" else self.server.getRandomWorld()
+        self.world = self.forceLevel if self.forceLevel != "" else self.server.getRandomWorld(self.gameMode)
 
         if not self.private:
             reactor.callLater(3, self.broadLoadWorld)

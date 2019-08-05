@@ -126,6 +126,22 @@ def updateAccount(username, data):
         acc["skin"] = data["skin"]
     persistState()
 
+def changePassword(username, password):
+    if username not in accounts:
+        return
+    if len(password) < 8:
+        return
+    if len(password) > 120:
+        return
+    
+    salt = hashlib.sha256(os.urandom(60)).hexdigest().encode('ascii')
+    pwdhash = ph.hash(password.encode('utf-8')+salt)
+
+    acc = accounts[username]
+    acc["salt"] = salt
+    acc["pwdhash"] = pwdhash
+    persistState()
+
 def logout(token):
     if token in session:
         del session[token]
