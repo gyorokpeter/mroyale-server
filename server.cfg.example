@@ -20,6 +20,9 @@ MaxSimulIP: 3
 # Discord Webhook Url for Discord functioning (see more: https://support.discordapp.com/hc/en-us/articles/228383668)
 DiscordWebhookUrl: 
 
+# Skin count
+SkinCount: 4
+
 [Match]
 # Minimum of players to a match start by votes
 PlayerMin: 2
@@ -50,3 +53,4 @@ WorldsPVP:
 
 # The gameMode Hell worlds
 WorldsHell: 
+

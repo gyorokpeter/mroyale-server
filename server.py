@@ -45,7 +45,6 @@ from buffer import Buffer
 from player import Player
 from match import Match
 
-NUM_SKINS = 176   #temporary until shop is implemented
 NUM_GM = 3
 
 class MyServerProtocol(WebSocketServerProtocol):
@@ -206,7 +205,7 @@ class MyServerProtocol(WebSocketServerProtocol):
                                      name,
                                      team if team != "" else self.server.defaultTeam,
                                      self.server.getMatch(team, priv, gm),
-                                     skin if skin in range(NUM_SKINS) else 0,
+                                     skin if skin in range(self.server.skinCount) else 0,
                                      gm if gm in range(NUM_GM) else 0)
                 self.loginSuccess()
                 self.server.players.append(self.player)
@@ -470,6 +469,7 @@ class MyServerFactory(WebSocketServerFactory):
         self.defaultName = config.get('Server', 'DefaultName').strip()
         self.defaultTeam = config.get('Server', 'DefaultTeam').strip()
         self.maxSimulIP = config.getint('Server', 'MaxSimulIP')
+        self.skinCount = config.getint('Server', 'SkinCount')
         self.discordWebhookUrl = config.get('Server', 'DiscordWebhookUrl').strip()
         self.playerMin = config.getint('Match', 'PlayerMin')
         try:
