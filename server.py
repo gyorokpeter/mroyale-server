@@ -486,6 +486,7 @@ class MyServerFactory(WebSocketServerFactory):
                 print("Couldn't start matches after player cap change...")
         self.autoStartTime = config.getint('Match', 'AutoStartTime')
         self.startTimer = config.getint('Match', 'StartTimer')
+        self.enableAutoStartInMultiPrivate = config.getboolean('Match', 'EnableAutoStartInMultiPrivate')
         self.enableVoteStart = config.getboolean('Match', 'EnableVoteStart')
         self.voteRateToStart = config.getfloat('Match', 'VoteRateToStart')
         self.allowLateEnter = config.getboolean('Match', 'AllowLateEnter')

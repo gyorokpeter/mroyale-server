@@ -131,7 +131,7 @@ class Match(object):
         pass
 
     def onPlayerReady(self, player):
-        if (not self.private or self.roomName != "") and not self.playing: # Ensure that the game starts even with fewer players
+        if (not self.private or (self.roomName != "" and self.server.enableAutoStartInMultiPrivate)) and not self.playing: # Ensure that the game starts even with fewer players
             if self.autoStartTimer is not None:
                 try:
                     self.autoStartTimer.reset(self.server.autoStartTime)
