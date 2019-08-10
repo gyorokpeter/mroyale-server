@@ -5,8 +5,11 @@ ListenPort: 9000
 # The moderator's code, this is useless until version 2.1.3
 MCode: 
 
-# The path to the file "status.json"
+# The path to the file "status.json" (optional)
 StatusPath: 
+
+# The path to the file "assets.json" (optional)
+AssetsMetadataPath: 
 
 # The name that will be set for unnamed players
 DefaultName: MARIO
@@ -20,7 +23,7 @@ MaxSimulIP: 3
 # Discord Webhook Url for Discord functioning (see more: https://support.discordapp.com/hc/en-us/articles/228383668)
 DiscordWebhookUrl: 
 
-# Skin count
+# Skin count - NOT USED if AssetsMetadataPath is set
 SkinCount: 4
 
 [Match]

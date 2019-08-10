@@ -405,20 +405,20 @@ class MyServerProtocol(WebSocketServerProtocol):
         return True
 
 class MyServerFactory(WebSocketServerFactory):
+
     def __init__(self, url):
-        try:
-            with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                   "server.cfg"), "r") as f:
-                self.configHash = hashlib.md5(f.read().encode('utf-8')).hexdigest()
-            self.readConfig(self.configHash)
-        except Exception as e:
+        self.configFilePath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "server.cfg")
+        self.blockedFilePath = os.path.join(os.path.dirname(os.path.abspath(__file__)),"blocked.json")
+        self.fileHash = {}
+        if not self.tryReloadFile(self.configFilePath, self.readConfig):
             sys.stderr.write("The file \"server.cfg\" does not exist or is invalid, consider renaming \"server.cfg.example\" to \"server.cfg\".\n")
-            sys.stderr.write(str(e)+"\n")
             if os.name == 'nt': # Enforce that the window opens in windows
                 print("Press ENTER to exit")
                 input()
             exit(1)
-        
+        if self.assetsMetadataPath:
+            self.tryReloadFile(self.assetsMetadataPath, self.readAssetsMetadata)
+
         WebSocketServerFactory.__init__(self, url.format(self.listenPort))
 
         self.players = list()
@@ -434,8 +434,7 @@ class MyServerFactory(WebSocketServerFactory):
 
         self.blocked = list()
         try:
-            with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                   "blocked.json"), "r") as f:
+            with open(self.blockedFilePath, "r") as f:
                 self.blocked = json.loads(f.read())
         except:
             pass
@@ -457,19 +456,38 @@ class MyServerFactory(WebSocketServerFactory):
 
         reactor.callLater(5, self.generalUpdate)
 
-    def readConfig(self, cfgHash):
-        self.configHash = cfgHash
-            
+    def tryReloadFile(self, fn, callback):
+        try:
+            with open(fn, "r") as f:
+                cfgHash = hashlib.md5(f.read().encode('utf-8')).hexdigest()
+                if not fn in self.fileHash or cfgHash != self.fileHash[fn]:
+                    self.fileHash[fn] = cfgHash
+                    callback()
+                    print(fn+" loaded.")
+            return True
+        except Exception as e:
+            print("Failed to load "+fn)
+            traceback.print_exc()
+            return False
+
+    def readAssetsMetadata(self):
+        with open(self.assetsMetadataPath, "r") as f:
+            meta = json.loads(f.read())
+            self.skinCount = meta["skins"]["count"]
+
+    def readConfig(self):
         config = configparser.ConfigParser()
         config.read('server.cfg')
 
         self.listenPort = config.getint('Server', 'ListenPort')
         self.mcode = config.get('Server', 'MCode').strip()
         self.statusPath = config.get('Server', 'StatusPath').strip()
+        self.assetsMetadataPath = config.get('Server', 'AssetsMetadataPath').strip()
         self.defaultName = config.get('Server', 'DefaultName').strip()
         self.defaultTeam = config.get('Server', 'DefaultTeam').strip()
         self.maxSimulIP = config.getint('Server', 'MaxSimulIP')
-        self.skinCount = config.getint('Server', 'SkinCount')
+        if not self.assetsMetadataPath:
+            self.skinCount = config.getint('Server', 'SkinCount')
         self.discordWebhookUrl = config.get('Server', 'DiscordWebhookUrl').strip()
         self.playerMin = config.getint('Match', 'PlayerMin')
         try:
@@ -509,20 +527,12 @@ class MyServerFactory(WebSocketServerFactory):
         self.in_messages = 0
         self.out_messages = 0
 
-        try:
-            with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                   "server.cfg"), "r") as f:
-                cfgHash = hashlib.md5(f.read().encode('utf-8')).hexdigest()
-                if cfgHash != self.configHash:
-                    self.readConfig(cfgHash)
-                    print("Configuration reloaded.")
-        except:
-            print("Failed to reload configuration.")
-
+        self.tryReloadFile(self.configFilePath, self.readConfig)
+        if self.assetsMetadataPath:
+            self.tryReloadFile(self.assetsMetadataPath, self.readAssetsMetadata)
         # Just to keep self.blocked synchronized with blocked.json
         try:
-            with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                   "blocked.json"), "r") as f:
+            with open(self.blockedFilePath, "r") as f:
                 self.blocked = json.loads(f.read())
         except:
             pass
@@ -582,8 +592,7 @@ class MyServerFactory(WebSocketServerFactory):
         if not address in self.blocked:
             self.blocked.append([address, playerName, reason])
             try:
-                with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                   "blocked.json"), "w") as f:
+                with open(self.blockedFilePath, "w") as f:
                     f.write(json.dumps(self.blocked))
             except:
                 pass
