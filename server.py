@@ -61,6 +61,7 @@ class MyServerProtocol(WebSocketServerProtocol):
         self.session = str()
         self.player = None
         self.blocked = bool()
+        self.account = {}
 
         self.dcTimer = None
         self.maxConLifeTimer = None
@@ -201,12 +202,14 @@ class MyServerProtocol(WebSocketServerProtocol):
                 priv = packet["private"] if "private" in packet else False
                 skin = int(packet["skin"]) if "skin" in packet else 0
                 gm = int(packet["gm"]) if "gm" in packet else 0
+                isDev = self.account["isDev"] if "isDev" in self.account else False
                 self.player = Player(self,
                                      name,
                                      team if team != "" else self.server.defaultTeam,
                                      self.server.getMatch(team, priv, gm),
                                      skin if skin in range(self.server.skinCount) else 0,
-                                     gm if gm in range(NUM_GM) else 0)
+                                     gm if gm in range(NUM_GM) else 0,
+                                     isDev)
                 self.loginSuccess()
                 self.server.players.append(self.player)
                 
@@ -230,6 +233,7 @@ class MyServerProtocol(WebSocketServerProtocol):
 
                 j = {"type": "llg", "status": status, "msg": msg}
                 if status:
+                    self.account = msg
                     j["username"] = self.username = username
                     self.session = msg["session"]
                     self.server.authd.append(self.username)
@@ -270,6 +274,7 @@ class MyServerProtocol(WebSocketServerProtocol):
 
                 if status:
                     del self.server.captchas[self.address]
+                    self.account = msg
                     self.username = username
                     self.session = msg["session"]
                     self.server.authd.append(self.username)
@@ -312,6 +317,7 @@ class MyServerProtocol(WebSocketServerProtocol):
                         self.sendJSON({"type": "lrs", "status": False, "msg": "account already in use"})
                         return
                     j["username"] = self.username = msg["username"]
+                    self.account = msg
                     self.session = msg["session"]
                     self.server.authd.append(self.username)
                 self.sendJSON(j)
@@ -418,6 +424,8 @@ class MyServerFactory(WebSocketServerFactory):
             exit(1)
         if self.assetsMetadataPath:
             self.tryReloadFile(self.assetsMetadataPath, self.readAssetsMetadata)
+        if self.mysqlHost:
+            datastore.checkDb(self.mysqlHost, self.mysqlPort, self.mysqlUser, self.mysqlPass, self.mysqlDB)
 
         WebSocketServerFactory.__init__(self, url.format(self.listenPort))
 
@@ -489,6 +497,12 @@ class MyServerFactory(WebSocketServerFactory):
         if not self.assetsMetadataPath:
             self.skinCount = config.getint('Server', 'SkinCount')
         self.discordWebhookUrl = config.get('Server', 'DiscordWebhookUrl').strip()
+        self.mysqlHost = config.get('Server', 'MySqlHost')
+        self.mysqlPort = config.getint('Server', 'MySqlPort')
+        self.mysqlUser = config.get('Server', 'MySqlUser')
+        self.mysqlPass = config.get('Server', 'MySqlPass')
+        self.mysqlDB = config.get('Server', 'MySqlDB')
+
         self.playerMin = config.getint('Match', 'PlayerMin')
         try:
             oldCap = self.playerCap

@@ -11,12 +11,13 @@ except Exception as e:
     pass
 
 class Player(object):
-    def __init__(self, client, name, team, match, skin, gm):
+    def __init__(self, client, name, team, match, skin, gm, isDev):
         self.client = client
         self.server = client.server
         self.match = match
         self.skin = skin
         self.gameMode = gm
+        self.isDev = isDev
         
         self.name = ' '.join(emoji.emojize(re.sub(r"[^\x00-\x7F]+", "", emoji.demojize(name)).strip())[:20].split()).upper()
         self.team = team
@@ -26,20 +27,7 @@ class Player(object):
             self.name = self.server.defaultName if self.client.username != "" else ("【G】"+self.server.defaultName)
         elif len(self.client.username) == 0:
             self.name = "【G】" + self.name
-        if self.client.username.lower() in ["taliondiscord",
-                                            "damonj17",
-                                            "ddmil@marioroyale:~$",
-                                            "pixelcraftian",
-                                            "igor",
-                                            "minus",
-                                            "cyuubi",
-                                            "gyorokpeter",
-                                            "zizzydizzymc",
-                                            "nuts & milk",
-                                            "jupitersky",
-                                            "nethowarrior",
-                                            "real novex",
-                                            "nightyoshi370"]:
+        if isDev:
             self.name = "【𝐃𝐄𝐕】" + self.name
         elif self.skin in [52]:
             self.skin = 0

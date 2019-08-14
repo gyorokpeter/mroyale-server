@@ -26,6 +26,12 @@ DiscordWebhookUrl:
 # Skin count - NOT USED if AssetsMetadataPath is set
 SkinCount: 4
 
+# Parameters for connecting to MySQL
+MySqlHost:
+MySqlPort:
+MySqlUser:
+MySqlDb:
+
 [Match]
 # Minimum of players to a match start by votes
 PlayerMin: 2

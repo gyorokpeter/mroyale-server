@@ -1,5 +1,8 @@
 import os
 import hashlib
+import traceback
+import re
+
 try:
     import argon2
     A2_IMPORT = True
@@ -7,29 +10,65 @@ except:
     # Maybe we can switch to a built-in passwordHasher?
     print("Can't import argon2-cffi, accounts functioning will be disabled.")
     A2_IMPORT = False
+
 import pickle
 import secrets
 
-accounts = {}
-session = {}
+loggedInSessions = {}
 
 if A2_IMPORT:
     ph = argon2.PasswordHasher()
 else:
     ph = None
 
-def loadState():
-    global accounts
-    try:
-        if os.path.exists("server.dat"):
-            with open("server.dat", "rb") as f:
-                accounts = pickle.load(f)
-    except Exception as e:
-        print(e)
+from sqlalchemy import Column, ForeignKey, Integer, String, Boolean, create_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship, sessionmaker
+from sqlalchemy.schema import MetaData
+
+Base = declarative_base()
+
+class Account(Base):
+    __tablename__ = "accounts"
+    id = Column(Integer, primary_key=True)
+    username = Column(String(20), nullable=False, unique=True)
+    salt = Column(String(64), nullable=False)
+    pwdhash = Column(String(128), nullable=False)
+    nickname = Column(String(50), nullable=False, unique=True)
+    skin = Column(Integer, nullable=False)
+    squad = Column(String(10), nullable=False)
+    isDev = Column(Boolean, nullable=False, default=False)
+    coins = Column(Integer, nullable=False, default=0)
+    def summary(self):
+        return {"username":self.username, "nickname":self.nickname, "skin":self.skin, "squad":self.squad, "isDev":self.isDev, "coins":self.coins}
+
+def checkTableSchema(expected, actual):
+    for c in expected.c.keys():
+        if not c in actual.c:
+            print("missing column from db: "+c)
+            engine.execute("ALTER TABLE "+expected.name+" ADD "+c+" "+str(expected.c[c].type.compile()))
+
+def checkTableSchemas(existingMetaData):
+    for t in Base.metadata.tables.keys():
+        if t in existingMetaData.tables:
+            checkTableSchema(Base.metadata.tables[t], existingMetaData.tables[t])
+        else:
+            Base.metadata.tables[t].create()
+
+def checkDb(host, port, user, password, db):
+    global engine
+    global session
+    engine = create_engine("mysql+mysqlconnector://"+user+":"+password+"@"+host+":"+str(port)+"/"+db, echo=False, pool_recycle=3600)
+    Base.metadata.bind = engine
+    Base.metadata.reflect()
+    DBSession = sessionmaker(bind=engine)
+    session = DBSession()
+    existingMetaData = MetaData(bind=engine)
+    existingMetaData.reflect()
+    checkTableSchemas(existingMetaData)
 
 def persistState():
-    with open("server.dat", "wb") as f:
-        pickle.dump(accounts, f)
+    session.commit()
 
 def register(username, password):
     if ph is None:
@@ -38,30 +77,26 @@ def register(username, password):
         return False, "username too short"
     if len(username) > 20:
         return False, "username too long"
+    if not re.match('^[a-zA-Z0-9]+$', username):
+        return False, "illegal character in username"
     if len(password) < 8:
         return False, "password too short"
     if len(password) > 120:
         return False, "password too long"
-    if username in accounts:
+    if 0<session.query(Account).filter_by(username=username).count():
         return False, "account already registered"
     
     salt = hashlib.sha256(os.urandom(60)).hexdigest().encode('ascii')
     pwdhash = ph.hash(password.encode('utf-8')+salt)
     
-    acc = { "salt": salt,
-            "pwdhash": pwdhash,
-            "nickname": username,
-            "skin": 0,
-            "squad": "" }
-    accounts[username] = acc
+    acc = Account(username=username, salt=salt, pwdhash=pwdhash, nickname=username,skin=0,squad="")
+    session.add(acc)
     persistState()
     
-    acc2 = acc.copy()
-    del acc2["salt"]
-    del acc2["pwdhash"]
+    acc2 = acc.summary()
     
     token = secrets.token_urlsafe(32)
-    session[token] = username
+    loggedInSessions[token] = username
     acc2["session"] = token
     return True, acc2
 
@@ -78,72 +113,75 @@ def login(username, password):
         return False, invalidMsg
     if len(password) > 120:
         return False, invalidMsg
-    if username not in accounts:
+
+    accs = session.query(Account).filter_by(username=username).all()
+    if 0==len(accs):
         return False, invalidMsg
-    acc = accounts[username]
-    
+    acc = accs[0]
+
     try:
-        ph.verify(acc["pwdhash"], password.encode('utf-8')+acc["salt"])
-    except:
+        ph.verify(acc.pwdhash, password.encode('utf-8')+acc.salt.encode('ascii'))
+    except argon2.exceptions.VerifyMismatchError:
         return False, invalidMsg
     
-    acc2 = acc.copy()
-    del acc2["salt"]
-    del acc2["pwdhash"]
+    acc2 = acc.summary()
     
     token = secrets.token_urlsafe(32)
-    session[token] = username
+    loggedInSessions[token] = username
     acc2["session"] = token
     return True, acc2
 
 def resumeSession(token):
-    if token not in session:
+    if token not in loggedInSessions:
         return False, "session expired, please log in"
-    
-    username = session[token]
-    if username not in accounts:
+
+    username = loggedInSessions[token]
+    accs = session.query(Account).filter_by(username=username).all()
+    if 0==len(accs):
         return False, "invalid user name or password"
-    acc = accounts[username]
-    
-    acc2 = acc.copy()
-    del acc2["salt"]
-    del acc2["pwdhash"]
-    
-    acc2["username"] = username
-    acc2["session"] = token
-    return True, acc2
+    acc = accs[0].summary()
+    acc["session"] = token
+    return True, acc
 
 def updateAccount(username, data):
-    if username not in accounts:
+    accs = session.query(Account).filter_by(username=username).all()
+    if 0==len(accs):
         return
-    
-    acc = accounts[username]
-    if "nickname" in data:
-        acc["nickname"] = data["nickname"]
+
+    acc = accs[0]
+    if "nickname" in data and len(data["nickname"])<=50 and data["nickname"] != acc.nickname:
+        dupenicks = session.query(Account).filter_by(nickname=data["nickname"]).all()
+        if 0==len(dupenicks):
+            #FIXME make it possible to return error status to user
+            acc.nickname = data["nickname"]
     if "squad" in data:
-        acc["squad"] = data["squad"]
+        if 3<len(data["squad"]):
+            data["squad"] = data["squad"][:3]
+        acc.squad = data["squad"]
     if "skin" in data:
-        acc["skin"] = data["skin"]
-    persistState()
+        acc.skin = data["skin"]
+    try:
+        persistState()
+    except:
+        session.rollback()
 
 def changePassword(username, password):
-    if username not in accounts:
+    accs = session.query(Account).filter_by(username=username).all()
+    if 0==len(accs):
         return
     if len(password) < 8:
         return
     if len(password) > 120:
         return
-    
+
     salt = hashlib.sha256(os.urandom(60)).hexdigest().encode('ascii')
     pwdhash = ph.hash(password.encode('utf-8')+salt)
 
-    acc = accounts[username]
-    acc["salt"] = salt
-    acc["pwdhash"] = pwdhash
+    acc = accs[0]
+    acc.salt = salt
+    acc.pwdhash = pwdhash
     persistState()
 
 def logout(token):
-    if token in session:
-        del session[token]
-
-loadState()
+    if token in loggedInSessions:
+        del loggedInSessions[token]
