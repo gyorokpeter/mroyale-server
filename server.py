@@ -327,7 +327,9 @@ class MyServerProtocol(WebSocketServerProtocol):
                     self.sendClose()
                     return
                 
-                datastore.updateAccount(self.username, packet)
+                res = datastore.updateAccount(self.username, packet)
+                j = {"type": "lpr", "status":res[0], "changes":res[1], "msg":res[2]}
+                self.sendJSON(j)
 
             elif type == "lpc": #password change
                 if self.username == "" or self.player is not None or self.pendingStat is None:

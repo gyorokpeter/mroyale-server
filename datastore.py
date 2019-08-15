@@ -68,7 +68,12 @@ def checkDb(host, port, user, password, db):
     checkTableSchemas(existingMetaData)
 
 def persistState():
-    session.commit()
+    try:
+        session.commit()
+        return True
+    except:
+        session.rollback()
+        return False
 
 def register(username, password):
     if ph is None:
@@ -146,24 +151,35 @@ def resumeSession(token):
 def updateAccount(username, data):
     accs = session.query(Account).filter_by(username=username).all()
     if 0==len(accs):
-        return
+        return (False, {}, "invalid account")
 
     acc = accs[0]
+    original = {"nickname": acc.nickname, "squad": acc.squad, "skin": acc.skin}   #to send rollback to user after a failed DB update
+    changes = {}
+
+    setNickname = False
     if "nickname" in data and len(data["nickname"])<=50 and data["nickname"] != acc.nickname:
         dupenicks = session.query(Account).filter_by(nickname=data["nickname"]).all()
-        if 0==len(dupenicks):
-            #FIXME make it possible to return error status to user
-            acc.nickname = data["nickname"]
+        if 0<len(dupenicks):
+            return (False, original, "nickname already in use")
+        setNickname = True
+
+    if setNickname:
+        acc.nickname = data["nickname"]
+        changes["nickname"] = data["nickname"]
     if "squad" in data:
         if 3<len(data["squad"]):
             data["squad"] = data["squad"][:3]
         acc.squad = data["squad"]
+        changes["squad"] = data["squad"]
     if "skin" in data:
         acc.skin = data["skin"]
-    try:
-        persistState()
-    except:
-        session.rollback()
+        changes["skin"] = data["skin"]
+    res = persistState()
+    if res:
+        return (True, changes, "")
+    else:
+        return (False, original, "failed to save to database")
 
 def changePassword(username, password):
     accs = session.query(Account).filter_by(username=username).all()
