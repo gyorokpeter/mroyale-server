@@ -4,6 +4,7 @@ import re
 import emoji
 from twisted.internet import reactor
 from buffer import Buffer
+import util
 
 try:
     from discord_webhook import DiscordEmbed
@@ -21,7 +22,7 @@ class Player(object):
         
         self.name = ' '.join(emoji.emojize(re.sub(r"[^\x00-\x7F]+", "", emoji.demojize(name)).strip())[:20].split()).upper()
         self.team = team
-        if len(self.team) > 0 and self.server.checkCurse(self.name):
+        if len(self.team) > 0 and not isDev and util.checkCurse(self.name):
             self.name = str()
         if len(self.name) == 0:
             self.name = self.server.defaultName if self.client.username != "" else ("【G】"+self.server.defaultName)
@@ -183,7 +184,7 @@ class Player(object):
                 if self.server.discordWebhook is not None and pos == 1 and not self.match.private:
                     name = self.name
                     # We already filter players that have a squad so...
-                    if len(self.team) == 0 and self.server.checkCurse(self.name):
+                    if len(self.team) == 0 and not isDev and util.checkCurse(self.name):
                         name = "[ censored ]"
                     embed = DiscordEmbed(description='**%s** has achieved **#1** victory royale!%s' % (name, " (PVP Mode)" if self.gameMode == 1 else " (Hell mode)" if self.gameMode == 2 else ""), color=0xffff00)
                     self.server.discordWebhook.add_embed(embed)

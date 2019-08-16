@@ -2,6 +2,8 @@ import os
 import hashlib
 import traceback
 import re
+import util
+import json
 
 try:
     import argon2
@@ -90,14 +92,17 @@ def register(username, password):
         return False, "password too long"
     if 0<session.query(Account).filter_by(username=username).count():
         return False, "account already registered"
-    
+    if not allowedNickname(username):
+        return (False, original, "nickname not allowed")
+
     salt = hashlib.sha256(os.urandom(60)).hexdigest().encode('ascii')
     pwdhash = ph.hash(password.encode('utf-8')+salt)
     
     acc = Account(username=username, salt=salt, pwdhash=pwdhash, nickname=username,skin=0,squad="")
     session.add(acc)
-    persistState()
-    
+    if not persistState():
+        return False, "failed to save account"
+
     acc2 = acc.summary()
     
     token = secrets.token_urlsafe(32)
@@ -148,6 +153,9 @@ def resumeSession(token):
     acc["session"] = token
     return True, acc
 
+def allowedNickname(nickname):
+    return not util.checkCurse(nickname)
+
 def updateAccount(username, data):
     accs = session.query(Account).filter_by(username=username).all()
     if 0==len(accs):
@@ -159,6 +167,8 @@ def updateAccount(username, data):
 
     setNickname = False
     if "nickname" in data and len(data["nickname"])<=50 and data["nickname"] != acc.nickname:
+        if not acc.isDev and not allowedNickname(data["nickname"]):
+            return (False, original, "nickname not allowed")
         dupenicks = session.query(Account).filter_by(nickname=data["nickname"]).all()
         if 0<len(dupenicks):
             return (False, original, "nickname already in use")

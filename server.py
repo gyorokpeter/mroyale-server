@@ -1,6 +1,7 @@
 import os
 import sys
 import datastore
+import util
 
 if sys.version_info.major != 3:
     sys.stderr.write("You need python 3.7 or later to run this script\n")
@@ -267,7 +268,7 @@ class MyServerProtocol(WebSocketServerProtocol):
                     status, msg = False, "invalid captcha"
                 elif CP_IMPORT and packet["captcha"].upper() != self.server.captchas[self.address]:
                     status, msg = False, "incorrect captcha"
-                elif self.server.checkCurse(username):
+                elif util.checkCurse(username):
                     status, msg = False, "please choose a different username"
                 else:
                     status, msg = datastore.register(username, packet["password"])
@@ -434,14 +435,6 @@ class MyServerFactory(WebSocketServerFactory):
         self.players = list()
         self.matches = list()
         
-        self.curse = list()
-        try:
-            with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                   "words.json"), "r") as f:
-                self.curse = json.loads(f.read())
-        except:
-            pass
-
         self.blocked = list()
         try:
             with open(self.blockedFilePath, "r") as f:
@@ -574,35 +567,6 @@ class MyServerFactory(WebSocketServerFactory):
         
         self.randomWorldList[gameMode] = list(worlds) # Make a copy
         return self.getRandomWorld(gameMode)
-
-    # Maybe this should be in a util class?
-    def leet2(self, word):
-        REPLACE = { str(index): str(letter) for index, letter in enumerate('oizeasgtb') }
-        letters = [ REPLACE.get(l, l) for l in word.lower() ]
-        return ''.join(letters)
-
-    def checkCurse(self, str):
-        if self.checkCheckCurse(str):
-            return True
-        str = self.leet2(str)
-        if self.checkCheckCurse(str):
-            return True
-        str = str.replace("|", "i").replace("$", "s").replace("@", "a").replace("&", "e")
-        str = ''.join(e for e in str if e.isalnum())
-        if self.checkCheckCurse(str):
-            return True
-        return False
-
-    def checkCheckCurse(self, str):
-        if len(str) <= 3:
-            return False
-        str = str.lower()
-        for w in self.curse:
-            if len(w) <= 3:
-                continue
-            if w in str:
-                return True
-        return False
 
     def blockAddress(self, address, playerName, reason):
         if not address in self.blocked:
