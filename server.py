@@ -66,6 +66,7 @@ class MyServerProtocol(WebSocketServerProtocol):
 
         self.dcTimer = None
         self.maxConLifeTimer = None
+        self.dbSession = datastore.getDbSession()
 
     def startDCTimer(self, time):
         self.stopDCTimer()
@@ -117,6 +118,7 @@ class MyServerProtocol(WebSocketServerProtocol):
             self.player = None
             self.pendingStat = None
             self.stat = str()
+        self.dbSession.close()
 
     def onMessage(self, payload, isBinary):
         if len(payload) == 0:
@@ -230,7 +232,7 @@ class MyServerProtocol(WebSocketServerProtocol):
                     self.sendJSON({"type": "llg", "status": False, "msg": "account already in use"})
                     return
 
-                status, msg = datastore.login(username, packet["password"])
+                status, msg = datastore.login(self.dbSession, username, packet["password"])
 
                 j = {"type": "llg", "status": status, "msg": msg}
                 if status:
@@ -254,7 +256,7 @@ class MyServerProtocol(WebSocketServerProtocol):
                     self.sendClose()
                     return
                 
-                datastore.logout(self.session)
+                datastore.logout(self.dbSession, self.session)
                 self.sendJSON({"type": "llo"})
 
             elif type == "lrg": #register
@@ -271,7 +273,7 @@ class MyServerProtocol(WebSocketServerProtocol):
                 elif util.checkCurse(username):
                     status, msg = False, "please choose a different username"
                 else:
-                    status, msg = datastore.register(username, packet["password"])
+                    status, msg = datastore.register(self.dbSession, username, packet["password"])
 
                 if status:
                     del self.server.captchas[self.address]
@@ -310,7 +312,7 @@ class MyServerProtocol(WebSocketServerProtocol):
                     return
                 self.stopDCTimer()
                 
-                status, msg = datastore.resumeSession(packet["session"])
+                status, msg = datastore.resumeSession(self.dbSession, packet["session"])
 
                 j = {"type": "lrs", "status": status, "msg": msg}
                 if status:
@@ -328,7 +330,7 @@ class MyServerProtocol(WebSocketServerProtocol):
                     self.sendClose()
                     return
                 
-                res = datastore.updateAccount(self.username, packet)
+                res = datastore.updateAccount(self.dbSession, self.username, packet)
                 j = {"type": "lpr", "status":res[0], "changes":res[1], "msg":res[2]}
                 self.sendJSON(j)
 
@@ -337,7 +339,7 @@ class MyServerProtocol(WebSocketServerProtocol):
                     self.sendClose()
                     return
 
-                datastore.changePassword(self.username, packet["password"])
+                datastore.changePassword(self.dbSession, self.username, packet["password"])
 
         elif self.stat == "g":
             if type == "g00": # Ingame state ready

@@ -59,7 +59,7 @@ def checkTableSchemas(existingMetaData):
 
 def checkDb(host, port, user, password, db):
     global engine
-    global session
+    global DBSession
     engine = create_engine("mysql+mysqlconnector://"+user+":"+password+"@"+host+":"+str(port)+"/"+db, echo=False, pool_recycle=3600)
     Base.metadata.bind = engine
     Base.metadata.reflect()
@@ -68,8 +68,12 @@ def checkDb(host, port, user, password, db):
     existingMetaData = MetaData(bind=engine)
     existingMetaData.reflect()
     checkTableSchemas(existingMetaData)
+    session.close()
 
-def persistState():
+def getDbSession():
+    return DBSession()
+
+def persistState(session):
     try:
         session.commit()
         return True
@@ -77,7 +81,7 @@ def persistState():
         session.rollback()
         return False
 
-def register(username, password):
+def register(session, username, password):
     if ph is None:
         return False, "account system disabled"
     if len(username) < 3:
@@ -110,7 +114,7 @@ def register(username, password):
     acc2["session"] = token
     return True, acc2
 
-def login(username, password):
+def login(session, username, password):
     if ph is None:
         return False, "account system disabled"
     
@@ -141,7 +145,7 @@ def login(username, password):
     acc2["session"] = token
     return True, acc2
 
-def resumeSession(token):
+def resumeSession(session, token):
     if token not in loggedInSessions:
         return False, "session expired, please log in"
 
@@ -156,7 +160,7 @@ def resumeSession(token):
 def allowedNickname(nickname):
     return not util.checkCurse(nickname)
 
-def updateAccount(username, data):
+def updateAccount(session, username, data):
     accs = session.query(Account).filter_by(username=username).all()
     if 0==len(accs):
         return (False, {}, "invalid account")
@@ -191,7 +195,7 @@ def updateAccount(username, data):
     else:
         return (False, original, "failed to save to database")
 
-def changePassword(username, password):
+def changePassword(session, username, password):
     accs = session.query(Account).filter_by(username=username).all()
     if 0==len(accs):
         return
@@ -208,6 +212,6 @@ def changePassword(username, password):
     acc.pwdhash = pwdhash
     persistState()
 
-def logout(token):
+def logout(dbSession, token):
     if token in loggedInSessions:
         del loggedInSessions[token]
