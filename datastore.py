@@ -104,7 +104,7 @@ def register(session, username, password):
     
     acc = Account(username=username, salt=salt, pwdhash=pwdhash, nickname=username,skin=0,squad="")
     session.add(acc)
-    if not persistState():
+    if not persistState(session):
         return False, "failed to save account"
 
     acc2 = acc.summary()
@@ -189,7 +189,7 @@ def updateAccount(session, username, data):
     if "skin" in data:
         acc.skin = data["skin"]
         changes["skin"] = data["skin"]
-    res = persistState()
+    res = persistState(session)
     if res:
         return (True, changes, "")
     else:
@@ -210,7 +210,7 @@ def changePassword(session, username, password):
     acc = accs[0]
     acc.salt = salt
     acc.pwdhash = pwdhash
-    persistState()
+    persistState(session)
 
 def logout(dbSession, token):
     if token in loggedInSessions:
