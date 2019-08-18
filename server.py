@@ -356,7 +356,7 @@ class MyServerProtocol(WebSocketServerProtocol):
             elif type == "g03": # World load completed
                 if self.player is None:
                     if self.blocked:
-                        self.sendBin(0x02, Buffer().writeInt16(0).writeInt16(0))
+                        self.sendBin(0x02, Buffer().writeInt16(0).writeInt16(0).writeInt8(0))
                         self.startDCTimer(15)
                         return
                     self.sendClose()

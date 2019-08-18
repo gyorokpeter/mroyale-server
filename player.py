@@ -60,7 +60,7 @@ class Player(object):
         return {"id": self.id, "name": self.name, "team": self.team}
 
     def serializePlayerObject(self):
-        return Buffer().writeInt16(self.id).writeInt8(self.level).writeInt8(self.zone).writeShor2(self.posX, self.posY).writeInt16(self.skin).toBytes()
+        return Buffer().writeInt16(self.id).writeInt8(self.level).writeInt8(self.zone).writeShor2(self.posX, self.posY).writeInt16(self.skin).writeInt8(self.isDev).toBytes()
 
     def loadWorld(self, worldName, levelData):
         self.dead = True
@@ -103,7 +103,7 @@ class Player(object):
         self.pendingWorld = None
         self.lastXOk = True
         
-        self.sendBin(0x02, Buffer().writeInt16(self.id).writeInt16(self.skin)) # ASSIGN_PID
+        self.sendBin(0x02, Buffer().writeInt16(self.id).writeInt16(self.skin).writeInt8(self.isDev)) # ASSIGN_PID
 
         self.match.onPlayerReady(self)
 
@@ -112,11 +112,12 @@ class Player(object):
             level, zone, pos = b.readInt8(), b.readInt8(), b.readShor2()
             self.level = level
             self.zone = zone
-            
+            self.posX = pos[0]
+            self.posY = pos[1]
+
             self.dead = False
             self.client.stopDCTimer()
-            
-            self.match.broadBin(0x10, Buffer().writeInt16(self.id).write(pktData).writeInt16(self.skin))
+            self.match.broadBin(0x10, self.serializePlayerObject())
 
         elif code == 0x11: # KILL_PLAYER_OBJECT
             if self.dead or self.win:
