@@ -60,7 +60,7 @@ def checkTableSchemas(existingMetaData):
 def checkDb(host, port, user, password, db):
     global engine
     global DBSession
-    engine = create_engine("mysql+mysqlconnector://"+user+":"+password+"@"+host+":"+str(port)+"/"+db, echo=False, pool_recycle=3600)
+    engine = create_engine("mysql+mysqlconnector://"+user+":"+password+"@"+host+":"+str(port)+"/"+db, echo=False, pool_size=10000, pool_recycle=3600)
     Base.metadata.bind = engine
     Base.metadata.reflect()
     DBSession = sessionmaker(bind=engine)
