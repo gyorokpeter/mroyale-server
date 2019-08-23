@@ -1,5 +1,8 @@
 import os
 import json
+import jsonschema
+
+levelJsonSchema = json.loads(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "levelSchema.json"), "r").read())
 
 curse = []
 cursePath=os.path.join(os.path.dirname(os.path.abspath(__file__)),"words.json")
@@ -38,3 +41,15 @@ def checkCheckCurse(name, blacklist):
             return True
     return False
 
+def validateLevel(lk):
+    good = True
+    s = []
+    try:
+        jsonschema.validate(instance=lk, schema=levelJsonSchema)
+    except Exception as e:
+        good = False
+        s=str(e).split("\n")
+        if 10<len(s):
+            s = s[:5]+["..."]+s[-5:]
+    if not good:
+        raise Exception("\n".join(s))

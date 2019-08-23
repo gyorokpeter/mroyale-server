@@ -53,6 +53,9 @@ class Player(object):
     def sendJSON(self, j):
         self.client.sendJSON(j)
 
+    def sendText(self, t):
+        self.client.sendText(t)
+
     def sendBin(self, code, b):
         self.client.sendBin(code, b)
 
@@ -62,14 +65,11 @@ class Player(object):
     def serializePlayerObject(self):
         return Buffer().writeInt16(self.id).writeInt8(self.level).writeInt8(self.zone).writeShor2(self.posX, self.posY).writeInt16(self.skin).writeInt8(self.isDev).toBytes()
 
-    def loadWorld(self, worldName, levelData):
+    def loadWorld(self, worldName, loadMsg):
         self.dead = True
         self.loaded = False
         self.pendingWorld = worldName
-        msg = {"game": worldName, "type": "g01"}
-        if worldName == "custom":
-            msg["levelData"] = levelData
-        self.sendJSON({"packets": [msg], "type": "s01"})
+        self.sendText(loadMsg)
         self.client.startDCTimer(15)
 
     def setStartTimer(self, time):
@@ -85,7 +85,15 @@ class Player(object):
             self.lobbier = True
 
         self.match.onPlayerEnter(self)
-        self.loadWorld(self.match.world, self.match.customLevelData)
+        self.loadWorld(self.match.world, self.match.getLoadMsg())
+        if self.team == "" and self.match.private:
+            self.sendLevelSelect()
+
+    def sendLevelSelect(self):
+        levelList = self.server.getLevelList("game", self.match.levelMode)
+        levelDicts = [{"shortId":self.server.levels[x]["shortname"], "longId":x} for x in levelList]
+        levelDicts.sort(key=lambda x: x["shortId"])
+        self.sendJSON({"type": "gll", "levels": levelDicts})
 
     def onLoadComplete(self):
         if self.loaded or self.pendingWorld is None:

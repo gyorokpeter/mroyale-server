@@ -57,12 +57,12 @@ VoteRateToStart: 0.85
 # Whether players can enter the match while the start timer is running (1 = yes, 0 = no)
 AllowLateEnter: 1
 
-# The game's worlds, if you don't know what you're doing, do not change it
+# The game's worlds, if you don't know what you're doing, do not change it / Ignored if levels directory present
 Worlds: world-1,world-2,world-3,world-5,world-6,world-l1,world-p
 
-# The gameMode PVP worlds
+# The gameMode PVP worlds / Ignored if levels directory present
 WorldsPVP: 
 
-# The gameMode Hell worlds
+# The gameMode Hell worlds / Ignored if levels directory present
 WorldsHell: 
 

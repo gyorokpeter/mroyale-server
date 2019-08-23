@@ -1,6 +1,8 @@
 { "type" : "object",
   "properties" : {
-    "type" : {"type" : "string", "pattern" : "^game$"},
+    "type" : {"type" : "string", "pattern" : "^game|lobby|jail$"},
+    "mode" : {"type" : "string", "pattern" : "^|lobby|jail|royale|hell$"},
+    "shortname" : {"type" : "string", "minLength" : 0},
     "resource" : {
         "type" : "array",
         "items" : {
@@ -31,7 +33,7 @@
                             "id" : { "type" : "integer" },
                             "initial" : { "type" : "integer" },
                             "color" : { "type" : "string", "pattern" : "#[0-9a-fA-F]{6}" },
-                            "music" : { "type" : "string", "minLength" : 1},
+                            "music" : { "type" : "string"},
                             "data" : {
                                 "type" : "array",
                                 "minItems" : 1,
@@ -74,5 +76,5 @@
         }
     }
   },
-  "required": ["type", "resource", "initial", "world"]
+  "required": ["type", "resource", "initial", "world", "shortname", "mode"]
 }

@@ -3,21 +3,21 @@ from buffer import Buffer
 import os
 import json
 import random
-import jsonschema
-
-levelJsonSchema = json.loads(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "levelSchema.json"), "r").read())
+import util
 
 class Match(object):
     def __init__(self, server, roomName, private, gameMode):
         self.server = server
 
         self.forceLevel = ""
-        self.customLevelData = ""
+        self.customLevelData = {}
+        self.isLobby = True
         self.world = "lobby"
         self.roomName = roomName
         self.closed = False
         self.private = private
         self.gameMode = gameMode
+        self.levelMode = self.gameMode if self.gameMode != "pvp" else "royale"
         self.playing = False
         self.autoStartTimer = None
         self.startTimer = int()
@@ -25,8 +25,15 @@ class Match(object):
         self.winners = int()
         self.lastId = -1
         self.players = list()
+        self.getRandomLevel("lobby", None)
 
         self.goldFlowerTaken = bool()
+
+    def getRandomLevel(self, type, mode):
+        self.world, self.customLevelData = self.server.getRandomLevel(type, mode)
+
+    def getLevel(self, level):
+        self.world, self.customLevelData = self.server.getLevel(level)
 
     def getNextPlayerId(self):
         self.lastId += 1
@@ -82,9 +89,17 @@ class Match(object):
                 continue
             player.sendBin(code, buff)
 
+    def getLoadMsg(self):
+        msg = {"game": self.world, "type": "g01"}
+        if self.world == "custom":
+            msg["levelData"] = json.dumps(self.customLevelData)
+        j = {"packets": [msg], "type": "s01"}
+        return json.dumps(j).encode('utf-8')
+
     def broadLoadWorld(self):
+        msg = self.getLoadMsg() #only serialize once!
         for player in self.players:
-            player.loadWorld(self.world, self.customLevelData)
+            player.loadWorld(self.world, msg)
 
     def broadStartTimer(self, time):
         self.startTimer = time * 30
@@ -140,10 +155,10 @@ class Match(object):
             else:
                 self.autoStartTimer = reactor.callLater(self.server.autoStartTime, self.start, True)
 
-        if self.world == "lobby" and self.goldFlowerTaken:
+        if self.isLobby and self.goldFlowerTaken:
             self.broadBin(0x20, Buffer().writeInt16(-1).writeInt8(0).writeInt8(0).writeInt32(458761).writeInt8(0))
 
-        if self.world == "lobby" or not player.lobbier or self.closed:
+        if self.isLobby or not player.lobbier or self.closed:
             for p in self.players:
                 if not p.loaded or p == player:
                     continue
@@ -181,13 +196,17 @@ class Match(object):
         if self.playing or (not forced and len(self.players) < (1 if self.private and self.roomName == "" else self.server.playerMin)): # We need at-least 10 players to start
             return
         self.playing = True
+        self.isLobby = False
         
         try:
             self.autoStartTimer.cancel()
         except:
             pass
-        
-        self.world = self.forceLevel if self.forceLevel != "" else self.server.getRandomWorld(self.gameMode)
+
+        if self.forceLevel != "":
+            self.getLevel(self.forceLevel)
+        else:
+            self.getRandomLevel("game", self.levelMode)
 
         if not self.private:
             reactor.callLater(3, self.broadLoadWorld)
@@ -198,10 +217,12 @@ class Match(object):
             
     def validateCustomLevel(self, level):
         lk = json.loads(level)
-        jsonschema.validate(instance=lk, schema=levelJsonSchema)
+        util.validateLevel(lk)
+        return lk
 
     def selectLevel(self, level):
-        if level == "" or level in self.server.worlds:
+        print(level)
+        if level == "" or level in self.server.levels:
             self.forceLevel = level
             self.broadLevelSelect()
 
@@ -211,7 +232,7 @@ class Match(object):
             player.sendJSON(data)
 
     def selectCustomLevel(self, level):
-        self.validateCustomLevel(level)
+        lk = self.validateCustomLevel(level)
         self.forceLevel = "custom"
-        self.customLevelData = level
+        self.customLevelData = lk
         self.broadLevelSelect()

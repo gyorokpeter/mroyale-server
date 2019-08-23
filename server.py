@@ -35,6 +35,7 @@ except:
 from autobahn.twisted.websocket import WebSocketServerProtocol, WebSocketServerFactory
 from twisted.internet.protocol import Factory
 import json
+import jsonschema
 import string
 import random
 import base64
@@ -145,6 +146,10 @@ class MyServerProtocol(WebSocketServerProtocol):
         #print("sendJSON: "+str(j))
         self.sendMessage(json.dumps(j).encode('utf-8'), False)
 
+    def sendText(self, t):
+        self.server.out_messages += 1
+        self.sendMessage(t, False)
+
     def sendBin(self, code, buff):
         self.server.out_messages += 1
         msg=Buffer().writeInt8(code).write(buff.toBytes() if isinstance(buff, Buffer) else buff).toBytes()
@@ -205,13 +210,15 @@ class MyServerProtocol(WebSocketServerProtocol):
                 priv = packet["private"] if "private" in packet else False
                 skin = int(packet["skin"]) if "skin" in packet else 0
                 gm = int(packet["gm"]) if "gm" in packet else 0
+                gm = gm if gm in range(NUM_GM) else 0
+                gm = ["royale", "pvp", "hell"][gm]
                 isDev = self.account["isDev"] if "isDev" in self.account else False
                 self.player = Player(self,
                                      name,
                                      team if team != "" else self.server.defaultTeam,
                                      self.server.getMatch(team, priv, gm),
                                      skin if skin in range(self.server.skinCount) else 0,
-                                     gm if gm in range(NUM_GM) else 0,
+                                     gm,
                                      isDev)
                 self.loginSuccess()
                 self.server.players.append(self.player)
@@ -345,7 +352,8 @@ class MyServerProtocol(WebSocketServerProtocol):
             if type == "g00": # Ingame state ready
                 if self.player is None or self.pendingStat is None:
                     if self.blocked:
-                        self.sendJSON({"packets": [{"game": "jail", "type": "g01"}], "type": "s01"})
+                        levelName, levelData = self.server.getRandomLevel("jail", None)
+                        self.sendJSON({"packets": [{"game": levelName, "levelData": json.dumps(levelData), "type": "g01"}], "type": "s01"})
                         return
                     self.sendClose()
                     return
@@ -420,13 +428,21 @@ class MyServerFactory(WebSocketServerFactory):
     def __init__(self, url):
         self.configFilePath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "server.cfg")
         self.blockedFilePath = os.path.join(os.path.dirname(os.path.abspath(__file__)),"blocked.json")
+        self.levelsPath = os.path.join(os.path.dirname(os.path.abspath(__file__)),"levels")
+        if not os.path.isdir(self.levelsPath):
+            self.levelsPath = ""
         self.fileHash = {}
+        self.levels = {}
+        self.ownLevels = False
         if not self.tryReloadFile(self.configFilePath, self.readConfig):
             sys.stderr.write("The file \"server.cfg\" does not exist or is invalid, consider renaming \"server.cfg.example\" to \"server.cfg\".\n")
             if os.name == 'nt': # Enforce that the window opens in windows
                 print("Press ENTER to exit")
                 input()
             exit(1)
+        if self.levelsPath:
+            self.ownLevels = True
+            self.reloadLevels()
         if self.assetsMetadataPath:
             self.tryReloadFile(self.assetsMetadataPath, self.readAssetsMetadata)
         if self.mysqlHost:
@@ -460,6 +476,38 @@ class MyServerFactory(WebSocketServerFactory):
         self.out_messages = 0
 
         reactor.callLater(5, self.generalUpdate)
+
+    def reloadLevel(self, level):
+        fullPath = os.path.join(self.levelsPath, level)
+        try:
+            with open(fullPath, "r") as f:
+                content = f.read()
+                lk = json.loads(content)
+                util.validateLevel(lk)
+                lk["mtime"] = os.stat(fullPath).st_mtime
+                isNew = not level in self.levels
+                self.levels[level] = lk
+                print(level+" "+ ("loaded" if isNew else "reloaded") +".")
+        except:
+            print("error while loading "+level+":")
+            raise
+
+
+    def reloadLevels(self):
+        files = os.listdir(self.levelsPath)
+        files.sort()
+        deletedLevels = set(self.levels.keys())-set(files)
+        for f in deletedLevels:
+            del self.levels[f]
+            print(f+" deleted")
+        newLevels = set(files)-set(self.levels.keys())
+        for f in self.levels.keys(): #we do this first so levels only contains the still-existing levels
+            oldMt = self.levels[f]["mtime"]
+            newMt = os.stat(os.path.join(self.levelsPath, f)).st_mtime
+            if (newMt>oldMt):
+                self.reloadLevel(f)
+        for f in newLevels:
+            self.reloadLevel(f)
 
     def tryReloadFile(self, fn, callback):
         try:
@@ -519,17 +567,18 @@ class MyServerFactory(WebSocketServerFactory):
         self.enableVoteStart = config.getboolean('Match', 'EnableVoteStart')
         self.voteRateToStart = config.getfloat('Match', 'VoteRateToStart')
         self.allowLateEnter = config.getboolean('Match', 'AllowLateEnter')
-        self.worlds = config.get('Match', 'Worlds').strip().split(',')
-        self.worldsPvP = config.get('Match', 'WorldsPVP').strip()
-        if len(self.worldsPvP) == 0:
-            self.worldsPvP = list(self.worlds)
-        else:
-            self.worldsPvP = self.worldsPvP.split(',')
-        self.worldsHell = config.get('Match', 'WorldsHell').strip()
-        if len(self.worldsHell) == 0:
-            self.worldsHell = list(self.worlds)
-        else:
-            self.worldsHell = self.worldsHell.split(',')
+        if not self.levelsPath:
+            self.worlds = config.get('Match', 'Worlds').strip().split(',')
+            self.worldsPvP = config.get('Match', 'WorldsPVP').strip()
+            if len(self.worldsPvP) == 0:
+                self.worldsPvP = list(self.worlds)
+            else:
+                self.worldsPvP = self.worldsPvP.split(',')
+            self.worldsHell = config.get('Match', 'WorldsHell').strip()
+            if len(self.worldsHell) == 0:
+                self.worldsHell = list(self.worlds)
+            else:
+                self.worldsHell = self.worldsHell.split(',')
 
     def generalUpdate(self):
         playerCount = len(self.players)
@@ -547,28 +596,18 @@ class MyServerFactory(WebSocketServerFactory):
                 self.blocked = json.loads(f.read())
         except:
             pass
-        
+
+        if self.levelsPath:
+            self.reloadLevels()
+
         if self.statusPath:
             try:
                 with open(self.statusPath, "w") as f:
                     f.write('{"active":' + str(playerCount) + '}')
             except:
                 pass
-            
-        reactor.callLater(5, self.generalUpdate)
 
-    def getRandomWorld(self, gameMode):
-        worlds = self.worldsPvP if gameMode == 1 else self.worldsHell if gameMode == 2 else self.worlds
-        if len(worlds) == 0:
-            return None
-        
-        if gameMode in self.randomWorldList and len(self.randomWorldList[gameMode]) > 0:
-            selected = random.choice(self.randomWorldList[gameMode])
-            self.randomWorldList[gameMode].remove(selected)
-            return selected
-        
-        self.randomWorldList[gameMode] = list(worlds) # Make a copy
-        return self.getRandomWorld(gameMode)
+        reactor.callLater(5, self.generalUpdate)
 
     def blockAddress(self, address, playerName, reason):
         if not address in self.blocked:
@@ -613,6 +652,41 @@ class MyServerFactory(WebSocketServerFactory):
         if match in self.matches:
             self.matches.remove(match)
                 
+
+    def getLevel(self, level):
+        if not self.ownLevels:
+            return (level, "")
+        else:
+            return ("custom", self.levels[level])
+
+    def getLevelList(self, type, mode):
+        possibleLevels = [x for x in self.levels if self.levels[x]["type"] == type]
+        if mode is not None:
+            possibleLevels = [x for x in possibleLevels if self.levels[x]["mode"] == mode]
+        if len(possibleLevels) == 0:
+            raise Exception("no levels match type: "+type+" mode: "+mode)
+        return possibleLevels
+
+    def getRandomLevel(self, type, mode):
+        if not self.ownLevels:
+            if type == "lobby":
+                return ("lobby", "")
+            elif type == "jail":
+                return ("jail", "")
+            elif type == "game":
+                if mode == "royale":
+                    return (random.choice(self.worlds), "")
+                elif mode == "pvp":
+                    return (random.choice(self.worldsPVP), "")
+                elif mode == "hell":
+                    return (random.choice(self.worldsHell), "")
+                else:
+                    raise Exception("unknown game mode: "+mode)
+            else:
+                raise Exception("unknown level type: "+type)
+        possibleLevels = self.getLevelList(type, mode)
+        chosenLevel = random.choice(possibleLevels)
+        return ("custom", self.levels[chosenLevel])
 
 if __name__ == '__main__':
     factory = MyServerFactory(u"ws://127.0.0.1:{0}/royale/ws")
