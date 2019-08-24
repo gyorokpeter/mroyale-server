@@ -33,7 +33,8 @@ class Match(object):
         self.world, self.customLevelData = self.server.getRandomLevel(type, mode)
 
     def getLevel(self, level):
-        self.world, self.customLevelData = self.server.getLevel(level)
+        if self.world != "custom":
+            self.world, self.customLevelData = self.server.getLevel(level)
 
     def getNextPlayerId(self):
         self.lastId += 1
