@@ -19,6 +19,7 @@ class Match(object):
         self.gameMode = gameMode
         self.levelMode = self.gameMode if self.gameMode != "pvp" else "royale"
         self.playing = False
+        self.usingCustomLevel = False
         self.autoStartTimer = None
         self.startTimer = int()
         self.votes = int()
@@ -33,7 +34,7 @@ class Match(object):
         self.world, self.customLevelData = self.server.getRandomLevel(type, mode)
 
     def getLevel(self, level):
-        if self.world != "custom":
+        if not self.usingCustomLevel:
             self.world, self.customLevelData = self.server.getLevel(level)
 
     def getNextPlayerId(self):
@@ -224,6 +225,7 @@ class Match(object):
     def selectLevel(self, level):
         if level == "" or level in self.server.levels:
             self.forceLevel = level
+            self.usingCustomLevel = False
             self.broadLevelSelect()
 
     def broadLevelSelect(self):
@@ -233,6 +235,7 @@ class Match(object):
 
     def selectCustomLevel(self, level):
         lk = self.validateCustomLevel(level)
+        self.usingCustomLevel = True
         self.forceLevel = "custom"
         self.customLevelData = lk
         self.broadLevelSelect()
