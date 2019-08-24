@@ -208,12 +208,12 @@ class Match(object):
         else:
             self.getRandomLevel("game", self.levelMode)
 
-        if not self.private:
-            reactor.callLater(3, self.broadLoadWorld)
-            reactor.callLater(4, self.broadStartTimer, self.server.startTimer)
-        else:
-            self.broadLoadWorld()
-            reactor.callLater(1, self.broadStartTimer, self.server.startTimer)
+        #if not self.private:   #what's the reason for this? it makes players appear frozen mid-air for 3 seconds and keeps being reported as a bug
+        #    reactor.callLater(3, self.broadLoadWorld)
+        #    reactor.callLater(4, self.broadStartTimer, self.server.startTimer)
+        #else:
+        self.broadLoadWorld()
+        reactor.callLater(1, self.broadStartTimer, self.server.startTimer)
             
     def validateCustomLevel(self, level):
         lk = json.loads(level)
@@ -221,7 +221,6 @@ class Match(object):
         return lk
 
     def selectLevel(self, level):
-        print(level)
         if level == "" or level in self.server.levels:
             self.forceLevel = level
             self.broadLevelSelect()
