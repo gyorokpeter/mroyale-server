@@ -64,6 +64,7 @@ class MyServerProtocol(WebSocketServerProtocol):
         self.player = None
         self.blocked = bool()
         self.account = {}
+        self.accId = None
 
         self.dcTimer = None
         self.maxConLifeTimer = None
@@ -113,6 +114,17 @@ class MyServerProtocol(WebSocketServerProtocol):
             self.server.authd.remove(self.username)
 
         if self.stat == "g" and self.player != None:
+            if self.username != "" and not self.player.match.private:
+                changed={}
+                if self.player.wins > 0:
+                    changed["wins"] = self.player.wins
+                if self.player.deaths > 0:
+                    changed["deaths"] = self.player.deaths
+                if self.player.kills > 0:
+                    changed["kills"] = self.player.kills
+                if self.player.coins > 0:
+                    changed["coins"] = self.player.coins
+                datastore.updateStats(self.dbSession, self.accId, changed)
             self.server.players.remove(self.player)
             self.player.match.removePlayer(self.player)
             self.player.match = None
@@ -239,7 +251,7 @@ class MyServerProtocol(WebSocketServerProtocol):
                     self.sendJSON({"type": "llg", "status": False, "msg": "account already in use"})
                     return
 
-                status, msg = datastore.login(self.dbSession, username, packet["password"])
+                status, msg, self.accId = datastore.login(self.dbSession, username, packet["password"])
 
                 j = {"type": "llg", "status": status, "msg": msg}
                 if status:
@@ -280,7 +292,7 @@ class MyServerProtocol(WebSocketServerProtocol):
                 elif util.checkCurse(username):
                     status, msg = False, "please choose a different username"
                 else:
-                    status, msg = datastore.register(self.dbSession, username, packet["password"])
+                    status, msg, self.accId = datastore.register(self.dbSession, username, packet["password"])
 
                 if status:
                     del self.server.captchas[self.address]
@@ -319,7 +331,7 @@ class MyServerProtocol(WebSocketServerProtocol):
                     return
                 self.stopDCTimer()
                 
-                status, msg = datastore.resumeSession(self.dbSession, packet["session"])
+                status, msg, self.accId = datastore.resumeSession(self.dbSession, packet["session"])
 
                 j = {"type": "lrs", "status": status, "msg": msg}
                 if status:
@@ -383,7 +395,7 @@ class MyServerProtocol(WebSocketServerProtocol):
                     self.player.match.start(True)
             
             elif type == "gsl":  # Level select
-                if self.player is None or self.player.team != "" or not self.player.match.private:
+                if self.player is None or (not self.server.enableLevelSelectInMultiPrivate and self.player.team != "") or not self.player.match.private:
                     return
                 
                 levelName = packet["name"]
@@ -564,6 +576,7 @@ class MyServerFactory(WebSocketServerFactory):
         self.autoStartTime = config.getint('Match', 'AutoStartTime')
         self.startTimer = config.getint('Match', 'StartTimer')
         self.enableAutoStartInMultiPrivate = config.getboolean('Match', 'EnableAutoStartInMultiPrivate')
+        self.enableLevelSelectInMultiPrivate = config.getboolean('Match', 'EnableLevelSelectInMultiPrivate')
         self.enableVoteStart = config.getboolean('Match', 'EnableVoteStart')
         self.voteRateToStart = config.getfloat('Match', 'VoteRateToStart')
         self.allowLateEnter = config.getboolean('Match', 'AllowLateEnter')
@@ -598,7 +611,10 @@ class MyServerFactory(WebSocketServerFactory):
             pass
 
         if self.levelsPath:
-            self.reloadLevels()
+            try:
+                self.reloadLevels()
+            except:
+                traceback.print_exc()
 
         if self.statusPath:
             try:

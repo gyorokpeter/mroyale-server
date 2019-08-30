@@ -40,15 +40,26 @@ class Account(Base):
     skin = Column(Integer, nullable=False)
     squad = Column(String(10), nullable=False)
     isDev = Column(Boolean, nullable=False, default=False)
-    coins = Column(Integer, nullable=False, default=0)
+    wins = Column(Integer, nullable=False, default=0, server_default="0")
+    deaths = Column(Integer, nullable=False, default=0, server_default="0")
+    kills = Column(Integer, nullable=False, default=0, server_default="0")
+    coins = Column(Integer, nullable=False, default=0, server_default="0")
     def summary(self):
-        return {"username":self.username, "nickname":self.nickname, "skin":self.skin, "squad":self.squad, "isDev":self.isDev, "coins":self.coins}
+        return {"username":self.username, "nickname":self.nickname, "skin":self.skin, "squad":self.squad, "isDev":self.isDev,
+            "wins":self.wins, "deaths":self.deaths, "kills":self.kills, "coins":self.coins}
 
 def checkTableSchema(expected, actual):
-    for c in expected.c.keys():
-        if not c in actual.c:
-            print("missing column from db: "+c)
-            engine.execute("ALTER TABLE "+expected.name+" ADD "+c+" "+str(expected.c[c].type.compile()))
+    for col in expected.c.keys():
+        if not col in actual.c:
+            print("missing column from db: "+col)
+            ec = expected.c[col]
+            sql="ALTER TABLE "+expected.name+" ADD "+col+" "+str(ec.type.compile())
+            if not ec.nullable:
+                sql += " NOT NULL"
+            if ec.server_default is not None:
+                sql += " DEFAULT "+ec.server_default.arg
+            print(sql)
+            engine.execute(sql)
 
 def checkTableSchemas(existingMetaData):
     for t in Base.metadata.tables.keys():
@@ -83,21 +94,21 @@ def persistState(session):
 
 def register(session, username, password):
     if ph is None:
-        return False, "account system disabled"
+        return False, "account system disabled", None
     if len(username) < 3:
-        return False, "username too short"
+        return False, "username too short", None
     if len(username) > 20:
-        return False, "username too long"
+        return False, "username too long", None
     if not re.match('^[a-zA-Z0-9]+$', username):
-        return False, "illegal character in username"
+        return False, "illegal character in username", None
     if len(password) < 8:
-        return False, "password too short"
+        return False, "password too short", None
     if len(password) > 120:
-        return False, "password too long"
+        return False, "password too long", None
     if 0<session.query(Account).filter_by(username=username).count():
-        return False, "account already registered"
+        return False, "account already registered", None
     if not allowedNickname(username):
-        return (False, original, "nickname not allowed")
+        return False, "nickname not allowed", None
 
     salt = hashlib.sha256(os.urandom(60)).hexdigest().encode('ascii')
     pwdhash = ph.hash(password.encode('utf-8')+salt)
@@ -105,57 +116,58 @@ def register(session, username, password):
     acc = Account(username=username, salt=salt, pwdhash=pwdhash, nickname=username,skin=0,squad="")
     session.add(acc)
     if not persistState(session):
-        return False, "failed to save account"
+        return False, "failed to save account", None
 
     acc2 = acc.summary()
     
     token = secrets.token_urlsafe(32)
     loggedInSessions[token] = username
     acc2["session"] = token
-    return True, acc2
+    return True, acc2, acc.id
 
 def login(session, username, password):
     if ph is None:
-        return False, "account system disabled"
+        return False, "account system disabled", None
     
     invalidMsg = "invalid user name or password"
     if len(username) < 3:
-        return False, invalidMsg
+        return False, invalidMsg, None
     if len(username) > 20:
-        return False, invalidMsg
+        return False, invalidMsg, None
     if len(password) < 8:
-        return False, invalidMsg
+        return False, invalidMsg, None
     if len(password) > 120:
-        return False, invalidMsg
+        return False, invalidMsg, None
 
     accs = session.query(Account).filter_by(username=username).all()
     if 0==len(accs):
-        return False, invalidMsg
+        return False, invalidMsg, None
     acc = accs[0]
 
     try:
         ph.verify(acc.pwdhash, password.encode('utf-8')+acc.salt.encode('ascii'))
     except argon2.exceptions.VerifyMismatchError:
-        return False, invalidMsg
+        return False, invalidMsg, None
     
     acc2 = acc.summary()
     
     token = secrets.token_urlsafe(32)
     loggedInSessions[token] = username
     acc2["session"] = token
-    return True, acc2
+    return True, acc2, acc.id
 
 def resumeSession(session, token):
     if token not in loggedInSessions:
-        return False, "session expired, please log in"
+        return False, "session expired, please log in", None
 
     username = loggedInSessions[token]
     accs = session.query(Account).filter_by(username=username).all()
     if 0==len(accs):
-        return False, "invalid user name or password"
-    acc = accs[0].summary()
-    acc["session"] = token
-    return True, acc
+        return False, "invalid user name or password", None
+    acc = accs[0]
+    acc2 = acc.summary()
+    acc2["session"] = token
+    return True, acc2, acc.id
 
 def allowedNickname(nickname):
     return not util.checkCurse(nickname)
@@ -215,3 +227,18 @@ def changePassword(session, username, password):
 def logout(dbSession, token):
     if token in loggedInSessions:
         del loggedInSessions[token]
+
+def updateStats(session, accId, fields):
+    accs = session.query(Account).filter_by(id=accId).all()
+    if 0==len(accs):
+        return
+    acc = accs[0]
+    if "wins" in fields:
+        acc.wins += fields["wins"]
+    if "deaths" in fields:
+        acc.deaths += fields["deaths"]
+    if "kills" in fields:
+        acc.kills += fields["kills"]
+    if "coins" in fields:
+        acc.coins += fields["coins"]
+    persistState(session)

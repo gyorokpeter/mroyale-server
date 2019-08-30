@@ -4,6 +4,7 @@ import os
 import json
 import random
 import util
+import copy
 
 class Match(object):
     def __init__(self, server, roomName, private, gameMode):
@@ -27,6 +28,7 @@ class Match(object):
         self.lastId = -1
         self.players = list()
         self.getRandomLevel("lobby", None)
+        self.initLevel()
 
         self.goldFlowerTaken = bool()
 
@@ -215,8 +217,20 @@ class Match(object):
         #    reactor.callLater(4, self.broadStartTimer, self.server.startTimer)
         #else:
         self.broadLoadWorld()
+        self.initLevel()
         reactor.callLater(1, self.broadStartTimer, self.server.startTimer)
-            
+
+    def initLevel(self):
+        self.level = copy.deepcopy(self.customLevelData)
+        self.initObjects()
+
+    def initObjects(self):
+        self.objects = [(lambda x:[(lambda x:{x["pos"]:x["type"] for x in x["obj"]})(x) for x in x["zone"]])(x) for x in self.level["world"]]
+        self.allcoins = [(lambda x:[(lambda x:[y for y in x if x[y]==97])(x) for x in x])(x) for x in self.objects]
+        self.tiles = [(lambda x:[(lambda x:x["data"])(x) for x in x["zone"]])(x) for x in self.level["world"]]
+        self.zoneHeight = [(lambda x:[(lambda x:len(x["data"]))(x) for x in x["zone"]])(x) for x in self.level["world"]]
+        self.coins = copy.deepcopy(self.allcoins)
+
     def validateCustomLevel(self, level):
         lk = json.loads(level)
         util.validateLevel(lk)
@@ -239,3 +253,38 @@ class Match(object):
         self.forceLevel = "custom"
         self.customLevelData = lk
         self.broadLevelSelect()
+
+    def objectEventTrigger(self, player, b, pktData):
+        level, zone, oid, type = b.readInt8(), b.readInt8(), b.readInt32(), b.readInt8()
+        if self.world == "lobby" and oid == 458761:
+            self.goldFlowerTaken = True
+        allcoins = self.allcoins[level][zone]
+        if oid in allcoins:
+            coins = self.coins[level][zone]
+            if not oid in coins:
+                return
+            player.addCoin()
+            coins.remove(oid)
+
+        self.broadBin(0x20, Buffer().writeInt16(player.id).write(pktData))
+
+    def tileEventTrigger(self, player, b, pktData):
+
+        level, zone, pos, type = b.readInt8(), b.readInt8(), b.readShor2(), b.readInt8()
+        y = self.zoneHeight[level][zone]-1-pos[1]
+        tile = self.tiles[level][zone][y][pos[0]]
+        id = (tile>>16)&0xff
+        extraData = (tile>>24)&0xff
+        if id==18 or id==22:    #normal and hidden coin blocks
+            player.addCoin()
+            self.tiles[level][zone][y][pos[0]] = 98331
+        elif id==19:    #multi-coin block
+            if extraData > 1:
+                player.addCoin()
+                self.tiles[level][zone][y][pos[0]] = (tile&0xffffff)|((extraData-1)<<24)
+            else:
+                if extraData == 1:
+                    player.addCoin()
+                self.tiles[level][zone][y][pos[0]] = 98331
+
+        self.broadBin(0x30, Buffer().writeInt16(player.id).write(pktData))

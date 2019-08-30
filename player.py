@@ -43,6 +43,10 @@ class Player(object):
         self.loaded = bool()
         self.lobbier = bool()
         self.lastUpdatePkt = None
+        self.wins = 0
+        self.deaths = 0
+        self.kills = 0
+        self.coins = 0
 
         self.trustCount = int()
         self.lastX = int()
@@ -81,12 +85,11 @@ class Player(object):
         if not self.dead:
             return
         
-        if self.match.world == "lobby":
-            self.lobbier = True
+        self.lobbier = self.match.isLobby
 
         self.match.onPlayerEnter(self)
         self.loadWorld(self.match.world, self.match.getLoadMsg())
-        if self.team == "" and self.match.private:
+        if (self.server.enableLevelSelectInMultiPrivate or self.team == "") and self.match.private:
             self.sendLevelSelect()
 
     def sendLevelSelect(self):
@@ -101,6 +104,7 @@ class Player(object):
 
         self.client.stopDCTimer()
         
+        self.lobbier = self.match.isLobby
         self.level = 0
         self.zone = 0
         self.posX = 35
@@ -130,10 +134,11 @@ class Player(object):
         elif code == 0x11: # KILL_PLAYER_OBJECT
             if self.dead or self.win:
                 return
-            
+
             self.dead = True
             self.client.startDCTimer(60)
-            
+
+            self.addDeath()
             self.match.broadBin(0x11, Buffer().writeInt16(self.id))
             
         elif code == 0x12: # UPDATE_PLAYER_OBJECT
@@ -178,6 +183,7 @@ class Player(object):
             if killer is None:
                 return
 
+            killer.addKill()
             killer.sendBin(0x17, Buffer().writeInt16(self.id).write(pktData))
 
         elif code == 0x18: # PLAYER_RESULT_REQUEST
@@ -188,6 +194,8 @@ class Player(object):
             self.client.startDCTimer(120)
 
             pos = self.match.getWinners()
+            if pos == 1:
+                self.addWin()
             try:
                 # Maybe this should be assynchronous?
                 if self.server.discordWebhook is not None and pos == 1 and not self.match.private:
@@ -216,18 +224,27 @@ class Player(object):
             if self.dead:
                 return
 
-            level, zone, oid, type = b.readInt8(), b.readInt8(), b.readInt32(), b.readInt8()
-
-            if self.match.world == "lobby" and oid == 458761:
-                self.match.goldFlowerTaken = True
-
-            self.match.broadBin(0x20, Buffer().writeInt16(self.id).write(pktData))
+            self.match.objectEventTrigger(self, b, pktData)
             
         elif code == 0x30: # TILE_EVENT_TRIGGER
             if self.dead:
                 return
 
-            level, zone, pos, type = b.readInt8(), b.readInt8(), b.readShor2(), b.readInt8()
+            self.match.tileEventTrigger(self, b, pktData)
 
-            self.match.broadBin(0x30, Buffer().writeInt16(self.id).write(pktData))
+    def addCoin(self):
+        if not self.lobbier:
+            self.coins += 1
+
+    def addWin(self):
+        if not self.lobbier:
+            self.wins += 1
+
+    def addDeath(self):
+        if not self.lobbier:
+            self.deaths += 1
+
+    def addKill(self):
+        if not self.lobbier:
+            self.kills += 1
 
