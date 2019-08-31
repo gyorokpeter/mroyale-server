@@ -242,3 +242,14 @@ def updateStats(session, accId, fields):
     if "coins" in fields:
         acc.coins += fields["coins"]
     persistState(session)
+
+def getLeaderBoard():
+    session = DBSession()
+    try:
+        coinLB = session.query(Account).order_by(Account.coins.desc()).limit(10)
+        winsLB = session.query(Account).order_by(Account.wins.desc()).limit(10)
+        return {"coinLeaderBoard":[{"pos":i, "nickname": x.nickname, "coins": x.coins} for i,x in enumerate(coinLB, 1)],
+            "winsLeaderBoard":[{"pos":i, "nickname": x.nickname, "wins": x.wins} for i,x in enumerate(winsLB, 1)]
+        }
+    finally:
+        session.close()

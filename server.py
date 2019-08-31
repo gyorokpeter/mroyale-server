@@ -11,6 +11,7 @@ if sys.version_info.major != 3:
     exit(1)
 
 from twisted.python import log
+from twisted.internet import task
 log.startLogging(sys.stdout)
 
 from autobahn.twisted import install_reactor
@@ -489,6 +490,16 @@ class MyServerFactory(WebSocketServerFactory):
 
         reactor.callLater(5, self.generalUpdate)
 
+        l = task.LoopingCall(self.updateLeaderBoard)
+        l.start(60.0)
+
+    def updateLeaderBoard(self):
+        if self.leaderBoardPath != '':
+            print("updating leader board")
+            leaderBoard = datastore.getLeaderBoard()
+            with open(self.leaderBoardPath, "w") as f:
+                f.write(json.dumps(leaderBoard))
+
     def reloadLevel(self, level):
         fullPath = os.path.join(self.levelsPath, level)
         try:
@@ -547,6 +558,7 @@ class MyServerFactory(WebSocketServerFactory):
         self.listenPort = config.getint('Server', 'ListenPort')
         self.mcode = config.get('Server', 'MCode').strip()
         self.statusPath = config.get('Server', 'StatusPath').strip()
+        self.leaderBoardPath = config.get('Server', 'LeaderBoardPath', fallback='').strip()
         self.assetsMetadataPath = config.get('Server', 'AssetsMetadataPath').strip()
         self.defaultName = config.get('Server', 'DefaultName').strip()
         self.defaultTeam = config.get('Server', 'DefaultTeam').strip()

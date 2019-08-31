@@ -8,6 +8,9 @@ MCode:
 # The path to the file "status.json" (optional)
 StatusPath: 
 
+# The path to the file "leaderboard.json" (optional)
+LeaderBoardPath:
+
 # The path to the file "assets.json" (optional)
 AssetsMetadataPath: 
 
