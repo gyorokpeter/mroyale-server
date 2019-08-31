@@ -235,6 +235,7 @@ class Player(object):
     def addCoin(self):
         if not self.lobbier:
             self.coins += 1
+        self.sendBin(0x21, Buffer().writeInt8(0))
 
     def addWin(self):
         if not self.lobbier:
