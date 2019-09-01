@@ -248,8 +248,10 @@ def getLeaderBoard():
     try:
         coinLB = session.query(Account).order_by(Account.coins.desc()).limit(10)
         winsLB = session.query(Account).order_by(Account.wins.desc()).limit(10)
+        killsLB = session.query(Account).order_by(Account.kills.desc()).limit(10)
         return {"coinLeaderBoard":[{"pos":i, "nickname": x.nickname, "coins": x.coins} for i,x in enumerate(coinLB, 1)],
-            "winsLeaderBoard":[{"pos":i, "nickname": x.nickname, "wins": x.wins} for i,x in enumerate(winsLB, 1)]
+            "winsLeaderBoard":[{"pos":i, "nickname": x.nickname, "wins": x.wins} for i,x in enumerate(winsLB, 1)],
+            "killsLeaderBoard":[{"pos":i, "nickname": x.nickname, "kills": x.kills} for i,x in enumerate(killsLB, 1)]
         }
     finally:
         session.close()
