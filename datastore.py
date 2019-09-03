@@ -44,9 +44,12 @@ class Account(Base):
     deaths = Column(Integer, nullable=False, default=0, server_default="0")
     kills = Column(Integer, nullable=False, default=0, server_default="0")
     coins = Column(Integer, nullable=False, default=0, server_default="0")
+    isBanned = Column(Boolean, nullable=False, default=False, server_default="0")
     def summary(self):
         return {"username":self.username, "nickname":self.nickname, "skin":self.skin, "squad":self.squad, "isDev":self.isDev,
             "wins":self.wins, "deaths":self.deaths, "kills":self.kills, "coins":self.coins}
+    def privSummary(self):
+        return {"id":self.id, "isBanned":self.isBanned}
 
 def checkTableSchema(expected, actual):
     for col in expected.c.keys():
@@ -123,7 +126,7 @@ def register(session, username, password):
     token = secrets.token_urlsafe(32)
     loggedInSessions[token] = username
     acc2["session"] = token
-    return True, acc2, acc.id
+    return True, acc2, acc.privSummary()
 
 def login(session, username, password):
     if ph is None:
@@ -154,7 +157,7 @@ def login(session, username, password):
     token = secrets.token_urlsafe(32)
     loggedInSessions[token] = username
     acc2["session"] = token
-    return True, acc2, acc.id
+    return True, acc2, acc.privSummary()
 
 def resumeSession(session, token):
     if token not in loggedInSessions:
@@ -167,7 +170,7 @@ def resumeSession(session, token):
     acc = accs[0]
     acc2 = acc.summary()
     acc2["session"] = token
-    return True, acc2, acc.id
+    return True, acc2, acc.privSummary()
 
 def allowedNickname(nickname):
     return not util.checkCurse(nickname)
@@ -241,6 +244,8 @@ def updateStats(session, accId, fields):
         acc.kills += fields["kills"]
     if "coins" in fields:
         acc.coins += fields["coins"]
+    if "isBanned" in fields:
+        acc.isBanned = fields["isBanned"]
     persistState(session)
 
 def getLeaderBoard():

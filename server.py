@@ -65,7 +65,7 @@ class MyServerProtocol(WebSocketServerProtocol):
         self.player = None
         self.blocked = bool()
         self.account = {}
-        self.accId = None
+        self.accountPriv = {}
 
         self.dcTimer = None
         self.maxConLifeTimer = None
@@ -115,17 +115,21 @@ class MyServerProtocol(WebSocketServerProtocol):
             self.server.authd.remove(self.username)
 
         if self.stat == "g" and self.player != None:
-            if self.username != "" and not self.player.match.private:
+            if self.username != "":
                 changed={}
-                if self.player.wins > 0:
-                    changed["wins"] = self.player.wins
-                if self.player.deaths > 0:
-                    changed["deaths"] = self.player.deaths
-                if self.player.kills > 0:
-                    changed["kills"] = self.player.kills
-                if self.player.coins > 0:
-                    changed["coins"] = self.player.coins
-                datastore.updateStats(self.dbSession, self.accId, changed)
+                if not self.player.match.private:
+                    if self.player.wins > 0:
+                        changed["wins"] = self.player.wins
+                    if self.player.deaths > 0:
+                        changed["deaths"] = self.player.deaths
+                    if self.player.kills > 0:
+                        changed["kills"] = self.player.kills
+                    if self.player.coins > 0:
+                        changed["coins"] = self.player.coins
+                if self.blocked:
+                    changed["isBanned"] = True
+                if 0<len(changed):
+                    datastore.updateStats(self.dbSession, self.accountPriv["id"], changed)
             self.server.players.remove(self.player)
             self.player.match.removePlayer(self.player)
             self.player.match = None
@@ -217,6 +221,11 @@ class MyServerProtocol(WebSocketServerProtocol):
                         self.blocked = True
                         self.setState("g") # Ingame
                         return
+                if self.username != "":
+                    if self.accountPriv["isBanned"]:
+                        self.blocked = True
+                        self.setState("g") # Ingame
+                        return
 
                 name = packet["name"]
                 team = packet["team"][:3].strip().upper()
@@ -252,7 +261,7 @@ class MyServerProtocol(WebSocketServerProtocol):
                     self.sendJSON({"type": "llg", "status": False, "msg": "account already in use"})
                     return
 
-                status, msg, self.accId = datastore.login(self.dbSession, username, packet["password"])
+                status, msg, self.accountPriv = datastore.login(self.dbSession, username, packet["password"])
 
                 j = {"type": "llg", "status": status, "msg": msg}
                 if status:
@@ -293,7 +302,7 @@ class MyServerProtocol(WebSocketServerProtocol):
                 elif util.checkCurse(username):
                     status, msg = False, "please choose a different username"
                 else:
-                    status, msg, self.accId = datastore.register(self.dbSession, username, packet["password"])
+                    status, msg, self.accountPriv = datastore.register(self.dbSession, username, packet["password"])
 
                 if status:
                     del self.server.captchas[self.address]
@@ -332,7 +341,7 @@ class MyServerProtocol(WebSocketServerProtocol):
                     return
                 self.stopDCTimer()
                 
-                status, msg, self.accId = datastore.resumeSession(self.dbSession, packet["session"])
+                status, msg, self.accountPriv = datastore.resumeSession(self.dbSession, packet["session"])
 
                 j = {"type": "lrs", "status": status, "msg": msg}
                 if status:
