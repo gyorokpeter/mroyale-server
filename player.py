@@ -63,8 +63,11 @@ class Player(object):
     def sendBin(self, code, b):
         self.client.sendBin(code, b)
 
-    def getSimpleData(self):
-        return {"id": self.id, "name": self.name, "team": self.team}
+    def getSimpleData(self, isDev):
+        result = {"id": self.id, "name": self.name, "team": self.team}
+        if isDev:
+            result["username"] = self.client.username
+        return result
 
     def serializePlayerObject(self):
         return Buffer().writeInt16(self.id).writeInt8(self.level).writeInt8(self.zone).writeShor2(self.posX, self.posY).writeInt16(self.skin).writeInt8(self.isDev).toBytes()
@@ -249,3 +252,10 @@ class Player(object):
         if not self.lobbier:
             self.kills += 1
 
+    def ban(self, ban):
+        if (ban):
+            if self.client.username == "":
+                self.client.block(0x4)
+            else:
+                self.client.blocked = True
+        self.client.sendClose()

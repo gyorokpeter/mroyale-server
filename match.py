@@ -118,23 +118,29 @@ class Match(object):
             self.closed = True
 
     def broadPlayerList(self):
-        if self.closed:
-            return # Don't broad player list when in main game
+        devOnly = self.playing   # Don't broad player list when in main game
+        playersData = self.getPlayersData(False);
+        playersDataDev = self.getPlayersData(True);
         data = {"packets": [
-            {"players": self.getPlayersData(),
+            {"players": playersData,
+             "type": "g12"}
+        ], "type": "s01"}
+        dataDev = {"packets": [
+            {"players": playersDataDev,
              "type": "g12"}
         ], "type": "s01"}
         for player in self.players:
-            if not player.loaded:
-                continue
-            player.sendJSON(data)
+            if player.isDev or not devOnly:
+                if not player.loaded:
+                    continue
+                player.sendJSON(data if not player.isDev else dataDev)
 
-    def getPlayersData(self):
+    def getPlayersData(self, isDev):
         playersData = []
         for player in self.players:
             # We need to include even not loaded players as the remaining player count
             # only updates on the start timer screen
-            playersData.append(player.getSimpleData())
+            playersData.append(player.getSimpleData(isDev))
         return playersData
 
     def broadPlayerUpdate(self, player, pktData):
@@ -288,3 +294,9 @@ class Match(object):
                 self.tiles[level][zone][y][pos[0]] = 98331
 
         self.broadBin(0x30, Buffer().writeInt16(player.id).write(pktData))
+
+    def banPlayer(self, pid, ban):
+        player = self.getPlayer(pid)
+        if player is None:
+            return
+        player.ban(ban)

@@ -421,6 +421,14 @@ class MyServerProtocol(WebSocketServerProtocol):
                     self.sendJSON({"type":"gsl","name":levelName,"status":"success","message":""})
                 else:
                     self.player.match.selectLevel(levelName)
+            elif type == "gbn":  # ban player
+                if not self.account["isDev"]:
+                    self.sendClose()
+                pid = packet["pid"]
+                ban = packet["ban"]
+                self.player.match.banPlayer(pid, ban)
+            else:
+                print("unknown message! "+payload)
 
     def onBinaryMessage(self):
         pktLenDict = { 0x10: 6, 0x11: 0, 0x12: 12, 0x13: 1, 0x17: 2, 0x18: 4, 0x19: 0, 0x20: 7, 0x30: 7 }
