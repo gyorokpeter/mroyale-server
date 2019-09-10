@@ -239,7 +239,7 @@ class MyServerProtocol(WebSocketServerProtocol):
                 isDev = self.account["isDev"] if "isDev" in self.account else False
                 self.player = Player(self,
                                      name,
-                                     team if team != "" else self.server.defaultTeam,
+                                     team if (team != "" or priv) else self.server.defaultTeam,
                                      self.server.getMatch(team, priv, gm),
                                      skin if skin in range(self.server.skinCount) else 0,
                                      gm,
