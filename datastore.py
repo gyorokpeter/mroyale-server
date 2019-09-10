@@ -246,6 +246,8 @@ def updateStats(session, accId, fields):
         acc.coins += fields["coins"]
     if "isBanned" in fields:
         acc.isBanned = fields["isBanned"]
+    if "nickname" in fields:
+        acc.nickname = fields["nickname"]
     persistState(session)
 
 def getLeaderBoard():

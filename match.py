@@ -300,3 +300,10 @@ class Match(object):
         if player is None:
             return
         player.ban(ban)
+
+    def renamePlayer(self, pid, newName):
+        player = self.getPlayer(pid)
+        if player is None:
+            return
+        player.rename(newName)
+        self.broadJSON({"type":"gnm", "pid":pid, "name":newName})

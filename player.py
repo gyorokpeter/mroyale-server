@@ -21,16 +21,13 @@ class Player(object):
         self.isDev = isDev
         
         self.name = ' '.join(emoji.emojize(re.sub(r"[^\x00-\x7F]+", "", emoji.demojize(name)).strip())[:20].split()).upper()
+        self.forceRenamed = False
         self.team = team
         if len(self.team) > 0 and not isDev and util.checkCurse(self.name):
             self.name = str()
         if len(self.name) == 0:
-            self.name = self.server.defaultName if self.client.username != "" else ("【G】"+self.server.defaultName)
-        elif len(self.client.username) == 0:
-            self.name = "【G】" + self.name
-        if isDev:
-            self.name = "【𝐃𝐄𝐕】" + self.name
-        elif self.skin in [52]:
+            self.name = self.server.defaultName if self.client.username != "" else self.server.defaultName
+        if not isDev and self.skin in [52]:
             self.skin = 0
         self.pendingWorld = None
         self.level = int()
@@ -64,7 +61,7 @@ class Player(object):
         self.client.sendBin(code, b)
 
     def getSimpleData(self, isDev):
-        result = {"id": self.id, "name": self.name, "team": self.team}
+        result = {"id": self.id, "name": self.name, "team": self.team, "isDev": self.isDev, "isGuest": len(self.client.username) == 0}
         if isDev:
             result["username"] = self.client.username
         return result
@@ -259,3 +256,7 @@ class Player(object):
             else:
                 self.client.blocked = True
         self.client.sendClose()
+
+    def rename(self, newName):
+        self.name = newName
+        self.forceRenamed = True

@@ -128,6 +128,8 @@ class MyServerProtocol(WebSocketServerProtocol):
                         changed["coins"] = self.player.coins
                 if self.blocked:
                     changed["isBanned"] = True
+                if self.player.forceRenamed:
+                    changed["nickname"] = self.player.name
                 if 0<len(changed):
                     datastore.updateStats(self.dbSession, self.accountPriv["id"], changed)
             self.server.players.remove(self.player)
@@ -427,6 +429,12 @@ class MyServerProtocol(WebSocketServerProtocol):
                 pid = packet["pid"]
                 ban = packet["ban"]
                 self.player.match.banPlayer(pid, ban)
+            elif type == "gnm":  # rename player
+                if not self.account["isDev"]:
+                    self.sendClose()
+                pid = packet["pid"]
+                newName = packet["name"]
+                self.player.match.renamePlayer(pid, newName)
             else:
                 print("unknown message! "+payload)
 
