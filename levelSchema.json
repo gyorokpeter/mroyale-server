@@ -1,7 +1,7 @@
 { "type" : "object",
   "properties" : {
-    "type" : {"type" : "string", "pattern" : "^game|lobby|jail$"},
-    "mode" : {"type" : "string", "pattern" : "^|lobby|jail|royale|hell$"},
+    "type" : {"type" : "string", "pattern" : "^game|lobby|jail|maintenance$"},
+    "mode" : {"type" : "string", "pattern" : "^|lobby|jail|maintenance|royale|hell$"},
     "shortname" : {"type" : "string", "minLength" : 0},
     "resource" : {
         "type" : "array",

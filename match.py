@@ -307,3 +307,7 @@ class Match(object):
             return
         player.rename(newName)
         self.broadJSON({"type":"gnm", "pid":pid, "name":newName})
+
+    def hurryUp(self, time):
+        for player in self.players:
+            player.hurryUp(time)

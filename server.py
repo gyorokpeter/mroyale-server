@@ -71,9 +71,18 @@ class MyServerProtocol(WebSocketServerProtocol):
         self.maxConLifeTimer = None
         self.dbSession = datastore.getDbSession()
 
+    def startDCTimerIndependent(self, time):
+        reactor.callLater(time, self.sendClose2)
+
     def startDCTimer(self, time):
         self.stopDCTimer()
-        self.dcTimer = reactor.callLater(time, self.sendClose)
+        self.dcTimer = reactor.callLater(time, self.sendClose2)
+
+    def sendClose2(self):
+        #this is a wrapper for debugging only
+        #print("sendClose2")
+        #self.crash()
+        self.sendClose()
 
     def stopDCTimer(self):
         try:
@@ -94,7 +103,7 @@ class MyServerProtocol(WebSocketServerProtocol):
             self.address = self.transport.getPeer().host
 
         # A connection can only be alive for 20 minutes
-        self.maxConLifeTimer = reactor.callLater(20 * 60, self.sendClose)
+        self.maxConLifeTimer = reactor.callLater(20 * 60, self.sendClose2)
  
         self.startDCTimer(25)
         self.setState("l")
@@ -156,7 +165,7 @@ class MyServerProtocol(WebSocketServerProtocol):
                 self.onTextMessage(payload.decode('utf8'))
         except Exception as e:
             traceback.print_exc()
-            self.sendClose()
+            self.sendClose2()
             self.recv.clear()
             return
 
@@ -208,16 +217,18 @@ class MyServerProtocol(WebSocketServerProtocol):
         if self.stat == "l":
             if type == "l00": # Input state ready
                 if self.player is not None or self.pendingStat is None:
-                    self.sendClose()
+                    self.sendClose2()
                     return
                 self.pendingStat = None
                 self.stopDCTimer()
 
                 if self.address != "127.0.0.1" and self.server.getPlayerCountByAddress(self.address) >= self.server.maxSimulIP:
-                    self.exception("Too many connections")
-                    self.sendClose()
+                    self.sendClose2()
                     return
 
+                if self.server.shuttingDown:
+                    self.setState("g") # Ingame
+                    return
                 for b in self.server.blocked:
                     if b[0] == self.address:
                         self.blocked = True
@@ -244,6 +255,8 @@ class MyServerProtocol(WebSocketServerProtocol):
                                      skin if skin in range(self.server.skinCount) else 0,
                                      gm,
                                      isDev)
+                if priv:
+                    self.maxConLifeTimer.cancel()
                 self.loginSuccess()
                 self.server.players.append(self.player)
                 
@@ -251,7 +264,7 @@ class MyServerProtocol(WebSocketServerProtocol):
 
             elif type == "llg": #login
                 if self.username != "" or self.player is not None or self.pendingStat is None:
-                    self.sendClose()
+                    self.sendClose2()
                     return
                 self.stopDCTimer()
                 
@@ -284,7 +297,7 @@ class MyServerProtocol(WebSocketServerProtocol):
 
             elif type == "llo": #logout
                 if self.username == "" or self.player is not None or self.pendingStat is None:
-                    self.sendClose()
+                    self.sendClose2()
                     return
                 
                 datastore.logout(self.dbSession, self.session)
@@ -292,7 +305,7 @@ class MyServerProtocol(WebSocketServerProtocol):
 
             elif type == "lrg": #register
                 if self.username != "" or self.address not in self.server.captchas or self.player is not None or self.pendingStat is None:
-                    self.sendClose()
+                    self.sendClose2()
                     return
                 self.stopDCTimer()
                 
@@ -316,7 +329,7 @@ class MyServerProtocol(WebSocketServerProtocol):
 
             elif type == "lrc": #request captcha
                 if self.username != "" or self.player is not None or self.pendingStat is None:
-                    self.sendClose()
+                    self.sendClose2()
                     return
                 if not CP_IMPORT:
                     self.server.captchas[self.address] = ""
@@ -339,7 +352,7 @@ class MyServerProtocol(WebSocketServerProtocol):
 
             elif type == "lrs": #resume session
                 if self.username != "" or self.player is not None or self.pendingStat is None:
-                    self.sendClose()
+                    self.sendClose2()
                     return
                 self.stopDCTimer()
                 
@@ -358,7 +371,7 @@ class MyServerProtocol(WebSocketServerProtocol):
 
             elif type == "lpr": #update profile
                 if self.username == "" or self.player is not None or self.pendingStat is None:
-                    self.sendClose()
+                    self.sendClose2()
                     return
                 
                 res = datastore.updateAccount(self.dbSession, self.username, packet)
@@ -367,7 +380,7 @@ class MyServerProtocol(WebSocketServerProtocol):
 
             elif type == "lpc": #password change
                 if self.username == "" or self.player is not None or self.pendingStat is None:
-                    self.sendClose()
+                    self.sendClose2()
                     return
 
                 datastore.changePassword(self.dbSession, self.username, packet["password"])
@@ -375,11 +388,15 @@ class MyServerProtocol(WebSocketServerProtocol):
         elif self.stat == "g":
             if type == "g00": # Ingame state ready
                 if self.player is None or self.pendingStat is None:
+                    if self.server.shuttingDown:
+                        levelName, levelData = self.server.getRandomLevel("maintenance", None)
+                        self.sendJSON({"packets": [{"game": levelName, "levelData": json.dumps(levelData), "type": "g01"}], "type": "s01"})
+                        return
                     if self.blocked:
                         levelName, levelData = self.server.getRandomLevel("jail", None)
                         self.sendJSON({"packets": [{"game": levelName, "levelData": json.dumps(levelData), "type": "g01"}], "type": "s01"})
                         return
-                    self.sendClose()
+                    self.sendClose2()
                     return
                 self.pendingStat = None
                 
@@ -387,11 +404,11 @@ class MyServerProtocol(WebSocketServerProtocol):
 
             elif type == "g03": # World load completed
                 if self.player is None:
-                    if self.blocked:
+                    if self.blocked or self.server.shuttingDown:
                         self.sendBin(0x02, Buffer().writeInt16(0).writeInt16(0).writeInt8(0))
-                        self.startDCTimer(15)
+                        #self.startDCTimer(15)
                         return
-                    self.sendClose()
+                    self.sendClose2()
                     return
                 self.player.onLoadComplete()
 
@@ -425,13 +442,13 @@ class MyServerProtocol(WebSocketServerProtocol):
                     self.player.match.selectLevel(levelName)
             elif type == "gbn":  # ban player
                 if not self.account["isDev"]:
-                    self.sendClose()
+                    self.sendClose2()
                 pid = packet["pid"]
                 ban = packet["ban"]
                 self.player.match.banPlayer(pid, ban)
             elif type == "gnm":  # rename player
                 if not self.account["isDev"]:
-                    self.sendClose()
+                    self.sendClose2()
                 pid = packet["pid"]
                 newName = packet["name"]
                 self.player.match.renamePlayer(pid, newName)
@@ -467,11 +484,13 @@ class MyServerFactory(WebSocketServerFactory):
         self.configFilePath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "server.cfg")
         self.blockedFilePath = os.path.join(os.path.dirname(os.path.abspath(__file__)),"blocked.json")
         self.levelsPath = os.path.join(os.path.dirname(os.path.abspath(__file__)),"levels")
+        self.shutdownFilePath = os.path.join(os.path.dirname(os.path.abspath(__file__)),"shutdown")
         if not os.path.isdir(self.levelsPath):
             self.levelsPath = ""
         self.fileHash = {}
         self.levels = {}
         self.ownLevels = False
+        self.shuttingDown = False
         if not self.tryReloadFile(self.configFilePath, self.readConfig):
             sys.stderr.write("The file \"server.cfg\" does not exist or is invalid, consider renaming \"server.cfg.example\" to \"server.cfg\".\n")
             if os.name == 'nt': # Enforce that the window opens in windows
@@ -653,12 +672,22 @@ class MyServerFactory(WebSocketServerFactory):
             except:
                 traceback.print_exc()
 
+        if os.path.exists(self.shutdownFilePath):
+            self.shuttingDown = True
+            print("shutting down...")
+            os.remove(self.shutdownFilePath)
+            for player in self.players:
+                player.hurryUp(180)
+
         if self.statusPath:
             try:
                 with open(self.statusPath, "w") as f:
-                    f.write('{"active":' + str(playerCount) + '}')
+                    f.write(json.dumps({"active":playerCount, "maintenance":self.shuttingDown}))
             except:
                 pass
+
+        if self.shuttingDown and playerCount == 0:
+            reactor.stop()
 
         reactor.callLater(5, self.generalUpdate)
 
@@ -717,7 +746,7 @@ class MyServerFactory(WebSocketServerFactory):
         if mode is not None:
             possibleLevels = [x for x in possibleLevels if self.levels[x]["mode"] == mode]
         if len(possibleLevels) == 0:
-            raise Exception("no levels match type: "+type+" mode: "+mode)
+            raise Exception("no levels match type: "+string(type)+" mode: "+string(mode))
         return possibleLevels
 
     def getRandomLevel(self, type, mode):

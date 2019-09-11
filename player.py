@@ -44,6 +44,7 @@ class Player(object):
         self.deaths = 0
         self.kills = 0
         self.coins = 0
+        self.hurryingUp = False
 
         self.trustCount = int()
         self.lastX = int()
@@ -103,7 +104,7 @@ class Player(object):
             return
 
         self.client.stopDCTimer()
-        
+
         self.lobbier = self.match.isLobby
         self.level = 0
         self.zone = 0
@@ -260,3 +261,10 @@ class Player(object):
     def rename(self, newName):
         self.name = newName
         self.forceRenamed = True
+
+    def hurryUp(self, time):
+        if self.hurryingUp:
+            return
+        self.hurryingUp = True
+        self.sendJSON({"type":"ghu", "time": time})
+        self.client.startDCTimerIndependent(time+30)
