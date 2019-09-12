@@ -68,7 +68,7 @@ class MyServerProtocol(WebSocketServerProtocol):
         self.accountPriv = {}
 
         self.dcTimer = None
-        self.maxConLifeTimer = None
+        #self.maxConLifeTimer = None
         self.dbSession = datastore.getDbSession()
 
     def startDCTimerIndependent(self, time):
@@ -103,7 +103,7 @@ class MyServerProtocol(WebSocketServerProtocol):
             self.address = self.transport.getPeer().host
 
         # A connection can only be alive for 20 minutes
-        self.maxConLifeTimer = reactor.callLater(20 * 60, self.sendClose2)
+        #self.maxConLifeTimer = reactor.callLater(20 * 60, self.sendClose2)
  
         self.startDCTimer(25)
         self.setState("l")
@@ -111,10 +111,10 @@ class MyServerProtocol(WebSocketServerProtocol):
     def onClose(self, wasClean, code, reason):
         #print("WebSocket connection closed: {0}".format(reason))
 
-        try:
-            self.maxConLifeTimer.cancel()
-        except:
-            pass
+        #try:
+        #    self.maxConLifeTimer.cancel()
+        #except:
+        #    pass
         self.stopDCTimer()
 
         if self.address in self.server.captchas:
@@ -255,8 +255,8 @@ class MyServerProtocol(WebSocketServerProtocol):
                                      skin if skin in range(self.server.skinCount) else 0,
                                      gm,
                                      isDev)
-                if priv:
-                    self.maxConLifeTimer.cancel()
+                #if priv:
+                #    self.maxConLifeTimer.cancel()
                 self.loginSuccess()
                 self.server.players.append(self.player)
                 
