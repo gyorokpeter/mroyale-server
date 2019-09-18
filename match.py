@@ -230,11 +230,22 @@ class Match(object):
         self.level = copy.deepcopy(self.customLevelData)
         self.initObjects()
 
+    def extractMainLayer(self, zone):
+        if "data" in zone:
+            return zone["data"]
+        elif "layers" in zone:
+            mainLayers = [x for x in zone["layers"] if x["z"] == 0]
+            if len(mainLayers) != 1:
+                raise Exception("invalid level - should have exactly one layer at depth 0")
+            return mainLayers[0]["data"]
+        else:
+            raise Exception("invalid level - neither data or layers present")
+
     def initObjects(self):
         self.objects = [(lambda x:[(lambda x:{x["pos"]:x["type"] for x in x["obj"]})(x) for x in x["zone"]])(x) for x in self.level["world"]]
         self.allcoins = [(lambda x:[(lambda x:[y for y in x if x[y]==97])(x) for x in x])(x) for x in self.objects]
-        self.tiles = [(lambda x:[(lambda x:x["data"])(x) for x in x["zone"]])(x) for x in self.level["world"]]
-        self.zoneHeight = [(lambda x:[(lambda x:len(x["data"]))(x) for x in x["zone"]])(x) for x in self.level["world"]]
+        self.tiles = [(lambda x:[self.extractMainLayer(x) for x in x["zone"]])(x) for x in self.level["world"]]
+        self.zoneHeight = [[len(y) for y in x] for x in self.tiles]
         self.coins = copy.deepcopy(self.allcoins)
 
     def validateCustomLevel(self, level):
