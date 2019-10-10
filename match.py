@@ -316,6 +316,8 @@ class Match(object):
         player = self.getPlayer(pid)
         if player is None:
             return
+        if player.isDev:
+            return
         player.rename(newName)
         self.broadJSON({"type":"gnm", "pid":pid, "name":newName})
 
