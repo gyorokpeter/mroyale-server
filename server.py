@@ -133,7 +133,7 @@ class MyServerProtocol(WebSocketServerProtocol):
                         changed["deaths"] = self.player.deaths
                     if self.player.kills > 0:
                         changed["kills"] = self.player.kills
-                    if self.player.coins > 0:
+                    if self.player.coins != 0:
                         changed["coins"] = self.player.coins
                 if self.blocked:
                     changed["isBanned"] = True
@@ -746,7 +746,7 @@ class MyServerFactory(WebSocketServerFactory):
         if mode is not None:
             possibleLevels = [x for x in possibleLevels if self.levels[x]["mode"] == mode]
         if len(possibleLevels) == 0:
-            raise Exception("no levels match type: "+string(type)+" mode: "+string(mode))
+            raise Exception("no levels match type: {} mode: {}".format(type, mode))
         return possibleLevels
 
     def getRandomLevel(self, type, mode):

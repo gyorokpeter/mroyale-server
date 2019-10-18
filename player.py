@@ -115,6 +115,7 @@ class Player(object):
         self.loaded = True
         self.pendingWorld = None
         self.lastXOk = True
+        self.flagTouched = False
         
         self.sendBin(0x02, Buffer().writeInt16(self.id).writeInt16(self.skin).writeInt8(self.isDev)) # ASSIGN_PID
 
@@ -141,7 +142,8 @@ class Player(object):
 
             self.addDeath()
             self.match.broadBin(0x11, Buffer().writeInt16(self.id))
-            
+            self.addLeaderBoardCoins(-10)
+
         elif code == 0x12: # UPDATE_PLAYER_OBJECT
             if self.dead or self.lastUpdatePkt == pktData:
                 return
@@ -150,11 +152,20 @@ class Player(object):
 
             if self.level != level or self.zone != zone:
                 self.match.onPlayerWarp(self, level, zone)
-                
+
+            if (self.level < level):
+                self.flagTouched = False
             self.level = level
             self.zone = zone
             self.posX = pos[0]
             self.posY = pos[1]
+            tile = self.match.getTile(level,zone,int(self.posX),int(self.posY))
+            tileDef = (tile>>16)&0xff
+            extraData = (tile>>24)&0xff
+            if (tileDef == 160 and extraData == 1 and not self.flagTouched):
+                self.addLeaderBoardCoins(500)
+            if (tileDef == 160):
+                self.flagTouched = True
             self.lastUpdatePkt = pktData
 
             if sprite > 5 and self.match.world == "lobby" and zone == 0:
@@ -186,6 +197,7 @@ class Player(object):
 
             killer.addKill()
             killer.sendBin(0x17, Buffer().writeInt16(self.id).write(pktData))
+            killer.addLeaderBoardCoins(10)
 
         elif code == 0x18: # PLAYER_RESULT_REQUEST
             if self.dead or self.win:
@@ -198,7 +210,7 @@ class Player(object):
             if pos == 1:
                 self.addWin()
             try:
-                # Maybe this should be assynchronous?
+                # Maybe this should be asynchronous?
                 if self.server.discordWebhook is not None and pos == 1 and not self.match.private:
                     name = self.name
                     # We already filter players that have a squad so...
@@ -213,7 +225,13 @@ class Player(object):
 
             # Make sure that everyone knows that the player is at the axe
             self.match.broadPlayerUpdate(self, self.lastUpdatePkt)
-            
+
+            if pos == 1:
+                self.addLeaderBoardCoins(200)
+            elif pos == 2:
+                self.addLeaderBoardCoins(100)
+            elif pos == 3:
+                self.addLeaderBoardCoins(50)
             self.match.broadBin(0x18, Buffer().writeInt16(self.id).writeInt8(pos).writeInt8(0))
             
         elif code == 0x19:
@@ -268,3 +286,8 @@ class Player(object):
         self.hurryingUp = True
         self.sendJSON({"type":"ghu", "time": time})
         self.client.startDCTimerIndependent(time+30)
+
+    def addLeaderBoardCoins(self, coins):
+        if not self.lobbier:
+            self.coins += coins
+        self.sendBin(0x22, Buffer().writeInt32(coins))

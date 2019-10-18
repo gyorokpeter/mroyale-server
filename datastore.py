@@ -243,7 +243,7 @@ def updateStats(session, accId, fields):
     if "kills" in fields:
         acc.kills += fields["kills"]
     if "coins" in fields:
-        acc.coins += fields["coins"]
+        acc.coins = max(0,acc.coins+fields["coins"])
     if "isBanned" in fields:
         acc.isBanned = fields["isBanned"]
     if "nickname" in fields:
