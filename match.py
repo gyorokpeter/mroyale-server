@@ -1,4 +1,4 @@
-from twisted.internet import reactor
+from twisted.internet import reactor, task
 from buffer import Buffer
 import os
 import json
@@ -22,6 +22,8 @@ class Match(object):
         self.playing = False
         self.usingCustomLevel = False
         self.autoStartTimer = None
+        self.autoStartTicks = 0
+        self.tickTimer = None
         self.startTimer = int()
         self.votes = int()
         self.winners = int()
@@ -104,6 +106,10 @@ class Match(object):
         for player in self.players:
             player.loadWorld(self.world, msg)
 
+    def broadTick(self):
+        self.broadJSON({"type":"gtk", "ticks":self.autoStartTicks, "votes":self.votes, "minPlayers":self.server.playerMin, "maxPlayers":self.server.playerCap,
+            "voteRateToStart":self.server.voteRateToStart})
+
     def broadStartTimer(self, time):
         self.startTimer = time * 30
         for player in self.players:
@@ -163,6 +169,10 @@ class Match(object):
                     pass
             else:
                 self.autoStartTimer = reactor.callLater(self.server.autoStartTime, self.start, True)
+        self.autoStartTicks = self.server.autoStartTime
+        if self.tickTimer is None:
+            self.tickTimer = task.LoopingCall(self.tick)
+            self.tickTimer.start(1.0)
 
         if self.isLobby or not player.lobbier or self.closed:
             for p in self.players:
@@ -208,6 +218,9 @@ class Match(object):
             self.autoStartTimer.cancel()
         except:
             pass
+        if self.tickTimer is not None:
+            self.tickTimer.stop()
+            self.tickTimer = None
 
         if self.forceLevel != "":
             self.getLevel(self.forceLevel)
@@ -365,3 +378,7 @@ class Match(object):
     def hurryUp(self, time):
         for player in self.players:
             player.hurryUp(time)
+
+    def tick(self):
+        self.autoStartTicks -= 1
+        self.broadTick()
