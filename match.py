@@ -21,6 +21,7 @@ class Match(object):
         self.levelMode = self.gameMode if self.gameMode != "pvp" else "royale"
         self.playing = False
         self.usingCustomLevel = False
+        self.autoStartOn = not self.private or (self.roomName != "" and self.server.enableAutoStartInMultiPrivate)
         self.autoStartTimer = None
         self.autoStartTicks = 0
         self.tickTimer = None
@@ -161,7 +162,7 @@ class Match(object):
         pass
 
     def onPlayerReady(self, player):
-        if (not self.private or (self.roomName != "" and self.server.enableAutoStartInMultiPrivate)) and not self.playing: # Ensure that the game starts even with fewer players
+        if self.autoStartOn and not self.playing: # Ensure that the game starts even with fewer players
             if self.autoStartTimer is not None:
                 try:
                     self.autoStartTimer.reset(self.server.autoStartTime)
@@ -169,7 +170,7 @@ class Match(object):
                     pass
             else:
                 self.autoStartTimer = reactor.callLater(self.server.autoStartTime, self.start, True)
-        self.autoStartTicks = self.server.autoStartTime
+            self.autoStartTicks = self.server.autoStartTime
         if self.tickTimer is None:
             self.tickTimer = task.LoopingCall(self.tick)
             self.tickTimer.start(1.0)
@@ -380,5 +381,6 @@ class Match(object):
             player.hurryUp(time)
 
     def tick(self):
-        self.autoStartTicks -= 1
+        if (self.autoStartOn):
+            self.autoStartTicks -= 1
         self.broadTick()
