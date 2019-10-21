@@ -288,6 +288,7 @@ class Match(object):
         self.allcoins = [(lambda x:[(lambda x:[y for y in x if x[y]==97])(x) for x in x])(x) for x in self.objects]
         self.tiles = [(lambda x:[self.extractMainLayer(x) for x in x["zone"]])(x) for x in self.level["world"]]
         self.zoneHeight = [[len(y) for y in x] for x in self.tiles]
+        self.zoneWidth = [[len(y[0]) for y in x] for x in self.tiles]
         self.coins = copy.deepcopy(self.allcoins)
         self.powerups = {}
 
@@ -332,6 +333,8 @@ class Match(object):
         self.broadBin(0x20, Buffer().writeInt16(player.id).write(pktData))
 
     def getTile(self, level, zone, x, y):
+        if x<0 or y<0 or x>=self.zoneWidth[level][zone] or y>=self.zoneHeight[level][zone]:
+            return 30
         return self.tiles[level][zone][self.zoneHeight[level][zone]-1-y][x]
 
     def tileEventTrigger(self, player, b, pktData):
