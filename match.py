@@ -59,6 +59,9 @@ class Match(object):
                 self.autoStartTimer.cancel()
             except:
                 pass
+            if self.tickTimer is not None:
+                self.tickTimer.stop()
+                self.tickTimer = None
             self.server.removeMatch(self)
             return
         

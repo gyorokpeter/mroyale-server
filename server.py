@@ -2,7 +2,7 @@ import os
 import sys
 import datastore
 import util
-import objgraph
+#import objgraph
 
 if sys.version_info.major != 3:
     sys.stderr.write("You need python 3.7 or later to run this script\n")
@@ -544,7 +544,7 @@ class MyServerFactory(WebSocketServerFactory):
             leaderBoard = datastore.getLeaderBoard()
             with open(self.leaderBoardPath, "w") as f:
                 f.write(json.dumps(leaderBoard))
-        objgraph.show_most_common_types(limit=20)
+        #[objgraph.show_backrefs(x,filename="refs"+str(i)+".dot") for i,x in enumerate(objgraph.by_type("Match"))]
 
     def reloadLevel(self, level):
         fullPath = os.path.join(self.levelsPath, level)
