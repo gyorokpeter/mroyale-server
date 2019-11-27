@@ -680,6 +680,7 @@ class MyServerFactory(WebSocketServerFactory):
             os.remove(self.shutdownFilePath)
             for player in self.players:
                 player.hurryUp(180)
+            reactor.callLater(240, self.shutdown)
 
         if self.statusPath:
             try:
@@ -692,6 +693,9 @@ class MyServerFactory(WebSocketServerFactory):
             reactor.stop()
 
         reactor.callLater(5, self.generalUpdate)
+
+    def shutdown(self):
+        reactor.stop()
 
     def blockAddress(self, address, playerName, reason):
         if not address in self.blocked:
