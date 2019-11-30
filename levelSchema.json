@@ -14,6 +14,8 @@
             "required" : ["id", "src"]
         }
     },
+    "musicOverridePath" : {"type" : "string"},
+    "soundOverridePath" : {"type" : "string"},
     "initial" : { "type" : "integer" },
     "world" : {
         "type" : "array",
