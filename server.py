@@ -2,7 +2,7 @@ import os
 import sys
 import datastore
 import util
-#import objgraph
+import objgraph
 
 if sys.version_info.major != 3:
     sys.stderr.write("You need python 3.7 or later to run this script\n")
@@ -544,7 +544,9 @@ class MyServerFactory(WebSocketServerFactory):
             leaderBoard = datastore.getLeaderBoard()
             with open(self.leaderBoardPath, "w") as f:
                 f.write(json.dumps(leaderBoard))
-        #[objgraph.show_backrefs(x,filename="refs"+str(i)+".dot") for i,x in enumerate(objgraph.by_type("Match"))]
+        if self.debugMemoryLeak:
+            objgraph.show_growth(limit=50)
+            [objgraph.show_backrefs(x,filename="debug/refs"+str(i)+".dot") for i,x in enumerate(objgraph.by_type("Match"))]
 
     def reloadLevel(self, level):
         fullPath = os.path.join(self.levelsPath, level)
@@ -617,6 +619,10 @@ class MyServerFactory(WebSocketServerFactory):
         self.mysqlUser = config.get('Server', 'MySqlUser')
         self.mysqlPass = config.get('Server', 'MySqlPass')
         self.mysqlDB = config.get('Server', 'MySqlDB')
+        self.debugMemoryLeak = config.getint('Server', 'debugMemoryLeak', fallback=0)
+        if self.debugMemoryLeak:
+            if not os.path.exists("debug"):
+                os.mkdir("debug")
 
         self.playerMin = config.getint('Match', 'PlayerMin')
         try:
