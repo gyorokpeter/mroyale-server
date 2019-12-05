@@ -453,6 +453,14 @@ class MyServerProtocol(WebSocketServerProtocol):
                 pid = packet["pid"]
                 newName = packet["name"]
                 self.player.match.renamePlayer(pid, newName)
+            elif type == "gsq":  # resquad player
+                if not self.account["isDev"]:
+                    self.sendClose2()
+                pid = packet["pid"]
+                newName = packet["name"].lower()
+                if len(newName)>3:
+                    newName = newName[:3]
+                self.player.match.resquadPlayer(pid, newName)
             else:
                 print("unknown message! "+payload)
 

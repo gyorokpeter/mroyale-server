@@ -280,6 +280,10 @@ class Player(object):
         self.name = newName
         self.forceRenamed = True
 
+    def resquad(self, newName):
+        self.team = newName
+        self.forceRenamed = True
+
     def hurryUp(self, time):
         if self.hurryingUp:
             return

@@ -382,6 +382,15 @@ class Match(object):
         player.rename(newName)
         self.broadJSON({"type":"gnm", "pid":pid, "name":newName})
 
+    def resquadPlayer(self, pid, newName):
+        player = self.getPlayer(pid)
+        if player is None:
+            return
+        if player.isDev:
+            return
+        player.resquad(newName)
+        self.broadJSON({"type":"gsq", "pid":pid, "name":newName})
+
     def hurryUp(self, time):
         for player in self.players:
             player.hurryUp(time)
