@@ -140,6 +140,7 @@ class MyServerProtocol(WebSocketServerProtocol):
                     changed["isBanned"] = True
                 if self.player.forceRenamed:
                     changed["nickname"] = self.player.name
+                    changed["squad"] = self.player.team
                 if 0<len(changed):
                     datastore.updateStats(self.dbSession, self.accountPriv["id"], changed)
             self.server.players.remove(self.player)
