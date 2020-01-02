@@ -549,7 +549,7 @@ class MyServerFactory(WebSocketServerFactory):
 
     def updateLeaderBoard(self):
         if self.leaderBoardPath != '':
-            print("updating leader board")
+            print("updating leader board at "+self.leaderBoardPath)
             leaderBoard = datastore.getLeaderBoard()
             with open(self.leaderBoardPath, "w") as f:
                 f.write(json.dumps(leaderBoard))
