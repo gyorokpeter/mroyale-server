@@ -246,6 +246,9 @@ class MyServerProtocol(WebSocketServerProtocol):
                 team = packet["team"][:3].strip().upper()
                 priv = packet["private"] if "private" in packet else False
                 skin = int(packet["skin"]) if "skin" in packet else 0
+                if not self.account and self.server.restrictPublicSkins and 0<len(self.server.guestSkins):
+                    if not skin in self.server.guestSkins:
+                        skin = self.server.guestSkins[0]
                 gm = int(packet["gm"]) if "gm" in packet else 0
                 gm = gm if gm in range(NUM_GM) else 0
                 gm = ["royale", "pvp", "hell"][gm]
@@ -499,6 +502,7 @@ class MyServerFactory(WebSocketServerFactory):
             self.levelsPath = ""
         self.fileHash = {}
         self.levels = {}
+        self.guestSkins = []
         self.ownLevels = False
         self.shuttingDown = False
         if not self.tryReloadFile(self.configFilePath, self.readConfig):
@@ -607,6 +611,7 @@ class MyServerFactory(WebSocketServerFactory):
         with open(self.assetsMetadataPath, "r") as f:
             meta = json.loads(f.read())
             self.skinCount = meta["skins"]["count"]
+            self.guestSkins=[x["id"] for x in meta["skins"]["properties"] if "forGuests" in x and x["forGuests"]]
 
     def readConfig(self):
         config = configparser.ConfigParser()
@@ -629,6 +634,7 @@ class MyServerFactory(WebSocketServerFactory):
         self.mysqlPass = config.get('Server', 'MySqlPass')
         self.mysqlDB = config.get('Server', 'MySqlDB')
         self.debugMemoryLeak = config.getint('Server', 'debugMemoryLeak', fallback=0)
+        self.restrictPublicSkins = config.getboolean('Server', 'restrictPublicSkins', fallback=False)
         if self.debugMemoryLeak:
             if not os.path.exists("debug"):
                 os.mkdir("debug")

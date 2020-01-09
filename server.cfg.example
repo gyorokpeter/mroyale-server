@@ -29,6 +29,9 @@ DiscordWebhookUrl:
 # Skin count - NOT USED if AssetsMetadataPath is set
 SkinCount: 4
 
+# If set to 1, guests can only use skins marked as "forGuests" in assets.json
+restrictPublicSkins: 0
+
 # Parameters for connecting to MySQL
 MySqlHost:
 MySqlPort:
