@@ -168,7 +168,8 @@ class Player(object):
                 self.flagTouched = True
             self.lastUpdatePkt = pktData
 
-            if sprite > 5 and self.match.world == "lobby" and zone == 0:
+            if self.server.banPowerUpInLobby and sprite > 5 and self.match.isLobby:
+                print("blocking player")
                 self.client.block(0x1)
                 return
             

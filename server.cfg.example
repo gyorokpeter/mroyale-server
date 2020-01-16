@@ -32,6 +32,9 @@ SkinCount: 4
 # If set to 1, guests can only use skins marked as "forGuests" in assets.json
 restrictPublicSkins: 0
 
+# If set to 1, players will be banned for picking up powerups in the lobby.
+banPowerUpInLobby: 0
+
 # Parameters for connecting to MySQL
 MySqlHost:
 MySqlPort:

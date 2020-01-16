@@ -635,6 +635,7 @@ class MyServerFactory(WebSocketServerFactory):
         self.mysqlDB = config.get('Server', 'MySqlDB')
         self.debugMemoryLeak = config.getint('Server', 'debugMemoryLeak', fallback=0)
         self.restrictPublicSkins = config.getboolean('Server', 'restrictPublicSkins', fallback=False)
+        self.banPowerUpInLobby = config.getboolean('Server', 'banPowerUpInLobby', fallback=False)
         if self.debugMemoryLeak:
             if not os.path.exists("debug"):
                 os.mkdir("debug")
