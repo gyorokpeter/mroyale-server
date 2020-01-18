@@ -163,13 +163,12 @@ class Player(object):
             tileDef = (tile>>16)&0xff
             extraData = (tile>>24)&0xff
             if (tileDef == 160 and extraData == 1 and not self.flagTouched):
-                self.addLeaderBoardCoins(500)
+                self.addLeaderBoardCoins(self.server.coinRewardFlagpole)
             if (tileDef == 160):
                 self.flagTouched = True
             self.lastUpdatePkt = pktData
 
             if self.server.banPowerUpInLobby and sprite > 5 and self.match.isLobby:
-                print("blocking player")
                 self.client.block(0x1)
                 return
             
@@ -228,11 +227,11 @@ class Player(object):
             self.match.broadPlayerUpdate(self, self.lastUpdatePkt)
 
             if pos == 1:
-                self.addLeaderBoardCoins(200)
+                self.addLeaderBoardCoins(self.server.coinRewardPodium1)
             elif pos == 2:
-                self.addLeaderBoardCoins(100)
+                self.addLeaderBoardCoins(self.server.coinRewardPodium2)
             elif pos == 3:
-                self.addLeaderBoardCoins(50)
+                self.addLeaderBoardCoins(self.server.coinRewardPodium3)
             self.match.broadBin(0x18, Buffer().writeInt16(self.id).writeInt8(pos).writeInt8(0))
             
         elif code == 0x19:

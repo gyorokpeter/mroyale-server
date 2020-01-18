@@ -78,3 +78,9 @@ WorldsPVP:
 # The gameMode Hell worlds / Ignored if levels directory present
 WorldsHell: 
 
+# Amount of leaderboard coins awarded for 1st, 2nd or 3rd place on the podium
+CoinRewardPodium1: 200
+CoinRewardPodium2: 100
+CoinRewardPodium3: 50
+# Amount of leaderboard coins awarded for hitting the top of a flagpole
+CoinRewardFlagpole: 500

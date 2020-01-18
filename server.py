@@ -660,6 +660,10 @@ class MyServerFactory(WebSocketServerFactory):
         self.enableVoteStart = config.getboolean('Match', 'EnableVoteStart')
         self.voteRateToStart = config.getfloat('Match', 'VoteRateToStart')
         self.allowLateEnter = config.getboolean('Match', 'AllowLateEnter')
+        self.coinRewardFlagpole = config.getint('Match', 'coinRewardFlagpole', fallback=500)
+        self.coinRewardPodium1 = config.getint('Match', 'coinRewardPodium1', fallback=200)
+        self.coinRewardPodium2 = config.getint('Match', 'coinRewardPodium2', fallback=100)
+        self.coinRewardPodium3 = config.getint('Match', 'coinRewardPodium3', fallback=50)
         if not self.levelsPath:
             self.worlds = config.get('Match', 'Worlds').strip().split(',')
             self.worldsPvP = config.get('Match', 'WorldsPVP').strip()
