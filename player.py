@@ -90,7 +90,7 @@ class Player(object):
 
         self.match.onPlayerEnter(self)
         self.loadWorld(self.match.world, self.match.getLoadMsg())
-        if (self.server.enableLevelSelectInMultiPrivate or self.team == "") and self.match.private:
+        if ((self.server.enableLevelSelectInMultiPrivate or self.team == "") and self.match.private) or self.isDev:
             self.sendLevelSelect()
 
     def sendLevelSelect(self):

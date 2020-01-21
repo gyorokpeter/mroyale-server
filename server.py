@@ -429,7 +429,7 @@ class MyServerProtocol(WebSocketServerProtocol):
                     self.player.match.start(True)
             
             elif type == "gsl":  # Level select
-                if self.player is None or (not self.server.enableLevelSelectInMultiPrivate and self.player.team != "") or not self.player.match.private:
+                if self.player is None or ((not self.server.enableLevelSelectInMultiPrivate and self.player.team != "") or not self.player.match.private) and not self.player.isDev:
                     return
                 
                 levelName = packet["name"]
