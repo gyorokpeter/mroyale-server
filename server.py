@@ -487,7 +487,8 @@ class MyServerProtocol(WebSocketServerProtocol):
         if self.player is None or not self.player.loaded or self.blocked or (not self.player.match.closed and self.player.match.playing):
             self.recv.clear()
             return False
-        
+
+        #print("Binary message received: code="+str(code)+", content:"+",".join([str(x) for x in b.toBytes()]));
         self.player.handlePkt(code, b, b.toBytes())
         return True
 
@@ -564,7 +565,7 @@ class MyServerFactory(WebSocketServerFactory):
     def reloadLevel(self, level):
         fullPath = os.path.join(self.levelsPath, level)
         try:
-            with open(fullPath, "r") as f:
+            with open(fullPath, "r", encoding="utf-8-sig") as f:
                 content = f.read()
                 lk = json.loads(content)
                 util.validateLevel(lk)
