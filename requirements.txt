@@ -15,3 +15,7 @@ configparser
 emoji
 jsonschema
 twisted
+secrets
+sqlalchemy
+objgraph
+mysql-connector-python-rf

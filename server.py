@@ -615,7 +615,7 @@ class MyServerFactory(WebSocketServerFactory):
             self.guestSkins=[x["id"] for x in meta["skins"]["properties"] if "forGuests" in x and x["forGuests"]]
 
     def readConfig(self):
-        config = configparser.ConfigParser()
+        config = configparser.ConfigParser(interpolation=None)
         config.read('server.cfg')
 
         self.listenPort = config.getint('Server', 'ListenPort')
